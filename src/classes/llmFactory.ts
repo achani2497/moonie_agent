@@ -3,7 +3,8 @@ import type { AvailableModels, StructuredPayload } from '@moonie-types/models.js
 import { getGeminiLLM } from '@utils/llm.js'
 
 const LLMs = {
-    'gemini-2.5-flash': getGeminiLLM
+    'gemini-2.5-flash': getGeminiLLM,
+    'gemini-3.1-flash-lite': getGeminiLLM
 }
 
 export class LLMFactory {

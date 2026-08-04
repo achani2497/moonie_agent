@@ -1,27 +1,35 @@
+import { MESSAGES_LIMIT } from '@constants/state.js'
 import { BaseMessage } from "@langchain/core/messages"
 import { Annotation } from "@langchain/langgraph"
-import { MESSAGES_LIMIT } from '@constants/state.js'
-import { AvailableLanguages, IntentType } from '@moonie-types/state.js'
+import { AvailableLanguages, IntentType, VisitorInfo } from '@moonie-types/state.js'
 
 export const moonieState = Annotation.Root({
     messages: Annotation<BaseMessage[]>({
         reducer: (prev, curr) => prev.concat(curr),
         default: () => []
     }),
+    visitorInfo: Annotation<VisitorInfo>({
+        reducer: (prev, curr) => ({
+            name: curr.name || prev.name,
+            email: curr.email || prev.email,
+            reason: curr.reason || prev.reason
+        }),
+        default: () => ({ name: null, email: null, reason: null })
+    }),
     lastIntent: Annotation<IntentType>({
         reducer: (_, curr) => curr,
         default: () => null
     }),
     messageLimit: Annotation<number>({
-        reducer: (_, curr) => curr--,
+        reducer: (_, curr) => curr,
         default: () => MESSAGES_LIMIT
     }),
     language: Annotation<AvailableLanguages>({
         reducer: (_, curr) => curr,
-        default: () => "es"
+        default: () => "en"
     }),
     downloadLanguageRequested: Annotation<AvailableLanguages>({
         reducer: (_, curr) => curr,
-        default: () => "es"
+        default: () => "en"
     }),
 })

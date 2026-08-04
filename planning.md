@@ -65,7 +65,10 @@
 - **DDoS**: no se cubre por ser overkill para una app chica personal.
 
 ### Modelo y prompts
-- **Modelo**: `gemini-1.5-flash` dentro de la capa gratuita de Google Gemini. Opción segura para un side project sin gastos.
+- **Modelos**: Google Gemini dentro de la capa gratuita.
+  - **Respuesta natural**: `gemini-2.5-flash` para presentación y respuestas al usuario (mejor redacción y razonamiento).
+  - **Extracción estructurada**: `gemini-3.1-flash-lite-001` para extraer `name`, `email` y `reason` de los mensajes (más barato, suficiente para la tarea).
+  - Alternativa: usar `gemini-2.5-flash` para ambos si se prefiere un solo modelo.
 - **Temperature**: `0` para minimizar alucinaciones y mantener respuestas basadas estrictamente en el contexto.
 - **Crédito de mensajes**: `15` preguntas por sesión.
 - **Parser de PDF**: `pdf-parse` por ser el más simple y eficiente para este caso de uso.
@@ -74,36 +77,53 @@
 - **Output hacia el frontend**: tipos definidos en `types/StructuredOutput.ts`. Debe soportar respuestas de texto y opciones renderizables como botones (preparado para el futuro agente de calendario).
 
 ### Nodos del grafo del agente de CV
-Se usa `conditionalEdge` para dirigir el flujo según `lastIntent`.
+Se usa `conditionalEdge` para dirigir el flujo según `lastIntent` y el estado de `visitorInfo`.
 
-1. **`checkMessageLimit`**: verifica si se alcanzó el límite de mensajes. Si es así, responde despedida y corta.
-2. **`presentationAndLanguageDetection`**: primer turno. Pide nombre, mail y razón de uso; detecta el idioma del primer mensaje.
-3. **`classifyIntent`**: clasifica el último mensaje del usuario en `cv-question`, `cv-download`, `other` o `unknown` usando Zod para output estructurado.
-4. **`loadContext`**: lee `cv.pdf` y `cv-complement.md` on-demand y arma el contexto para el LLM.
-5. **`answerCVQuestion`**: responde preguntas profesionales usando únicamente el contexto cargado.
-6. **`offerCVDownload`**: ofrece descargar el CV preguntando si lo quiere en español o inglés.
-7. **`resolveDownloadLanguage`**: interpreta la respuesta del usuario cuando elige idioma.
-8. **`sendCVLink`**: devuelve el link al archivo `cv.pdf` o `cv-en.pdf` según el idioma elegido.
-9. **`handleOther`**: responde amablemente que no puede ayudar con temas fuera del CV.
-10. **`handleUnknown`**: pide amablemente que reformule la pregunta.
+1. **`subtractOneMessageLimit`**: verifica si se alcanzó el límite de mensajes. Si es así, responde despedida y corta.
+2. **`generatePresentationResponse`**: genera la respuesta natural de Moonie (presentación + pedido de datos). Usa un LLM de texto libre siguiendo el patrón **Generation + Extraction**.
+3. **`extractVisitorInfo`**: extrae estructuradamente `name`, `email` y `reason` del último mensaje del usuario. Los campos son opcionales/nullable para evitar que el LLM invente datos.
+4. **`classifyIntent`**: clasifica el último mensaje del usuario en `cv-question`, `cv-download`, `other` o `unknown` usando Zod para output estructurado.
+5. **`loadContext`**: lee `cv.pdf` y `cv-complement.md` on-demand y arma el contexto para el LLM.
+6. **`answerCVQuestion`**: responde preguntas profesionales usando únicamente el contexto cargado.
+7. **`offerCVDownload`**: ofrece descargar el CV preguntando si lo quiere en español o inglés.
+8. **`resolveDownloadLanguage`**: interpreta la respuesta del usuario cuando elige idioma.
+9. **`sendCVLink`**: devuelve el link al archivo `cv.pdf` o `cv-en.pdf` según el idioma elegido.
+10. **`handleOther`**: responde amablemente que no puede ayudar con temas fuera del CV.
+11. **`handleUnknown`**: pide amablemente que reformule la pregunta.
 
 ### Casos de uso del agente de CV
 
-#### Caso 1: Primer contacto
+#### Caso 1: Primer contacto (faltan datos del visitante)
 El usuario entra al chat y escribe "Hola".
-- `checkMessageLimit`
-- `presentationAndLanguageDetection`
+- `subtractOneMessageLimit`
+- `generatePresentationResponse`
+- `extractVisitorInfo`
+- Conditional edge: `visitorInfo` incompleto → `END` (espera próximo mensaje del usuario)
+
+#### Caso 1b: Segundo turno completando datos
+El usuario responde "Soy Juan, quiero agendar una reunión".
+- `subtractOneMessageLimit`
+- `generatePresentationResponse`
+- `extractVisitorInfo`
+- Conditional edge: `visitorInfo` incompleto → `END` (sigue pidiendo email)
+
+#### Caso 1c: Datos completos
+El usuario responde "juan@example.com".
+- `subtractOneMessageLimit`
+- `generatePresentationResponse`
+- `extractVisitorInfo`
+- Conditional edge: `visitorInfo` completo → `classifyIntent`
 
 #### Caso 2: Pregunta sobre carrera profesional
 El usuario ya se presentó y pregunta "¿Cuántos años de experiencia tenés?".
-- `checkMessageLimit`
+- `subtractOneMessageLimit`
 - `classifyIntent`
 - `loadContext`
 - `answerCVQuestion`
 
 #### Caso 3: Descarga del CV en español
 El usuario dice "Quiero descargar tu CV" y luego responde "español".
-- `checkMessageLimit`
+- `subtractOneMessageLimit`
 - `classifyIntent`
 - `offerCVDownload`
 - `resolveDownloadLanguage`
@@ -111,19 +131,19 @@ El usuario dice "Quiero descargar tu CV" y luego responde "español".
 
 #### Caso 4: Pregunta fuera de alcance
 El usuario pregunta "¿Cuál es la capital de Francia?".
-- `checkMessageLimit`
+- `subtractOneMessageLimit`
 - `classifyIntent`
 - `handleOther`
 
 #### Caso 5: Mensaje incomprensible
 El usuario escribe "asdfghjkl".
-- `checkMessageLimit`
+- `subtractOneMessageLimit`
 - `classifyIntent`
 - `handleUnknown`
 
 #### Caso 6: Límite de mensajes alcanzado
 El usuario envía un mensaje siendo que ya usó sus 15 preguntas.
-- `checkMessageLimit` (responde despedida y finaliza)
+- `subtractOneMessageLimit` (responde despedida y finaliza)
 
 ## TODOs técnicos pendientes
 - [x] Definir modelo específico de Gemini y temperature.

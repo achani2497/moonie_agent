@@ -22,7 +22,7 @@
 - **Runtime**: Node.js + TypeScript 5 + tsx
 - **Framework API**: Express 4
 - **Lint/format**: ESLint 9 + typescript-eslint + Prettier
-- **LLM**: Google Gemini (capa gratuita generosa)
+- **LLM**: Google Gemini (capa gratuita) con `ModelPlanner` (router de modelos) + Ollama local para desarrollo
 - **Interfaz**: chat web incrustado en el portfolio (Astro + isla React).
 - **Primer agente a implementar**: agente de CV / preguntas profesionales
 
@@ -65,16 +65,32 @@
 - **DDoS**: no se cubre por ser overkill para una app chica personal.
 
 ### Modelo y prompts
-- **Modelos**: Google Gemini dentro de la capa gratuita.
-  - **Respuesta natural**: `gemini-2.5-flash` para presentación y respuestas al usuario (mejor redacción y razonamiento).
-  - **Extracción estructurada**: `gemini-3.1-flash-lite-001` para extraer `name`, `email` y `reason` de los mensajes (más barato, suficiente para la tarea).
-  - Alternativa: usar `gemini-2.5-flash` para ambos si se prefiere un solo modelo.
+- **Modelos**: gestionados por `ModelPlanner` (clase router con pools de modelos + fallback).
+  - **Pools diferenciados**: `CHAT_POOL` (respuesta al usuario) y `EXTRACT_POOL` (extracción/clasificación estructurada).
+  - **Fallback round-robin por pool**: si un modelo tira error de cuota (429 / `RATE_LIMIT_EXCEEDED` / `RESOURCE_EXHAUSTED`), se prueba el siguiente. Cualquier otro error se propaga (no se enmascaran bugs).
+  - **Cross-pool fallback**: si se agota el pool de la tarea, se cae al otro pool (`chain = [...primario, ...secundario]`).
+  - **Sticky model**: se guarda en memoria (singleton) el último modelo que respondió OK por tarea; el próximo request arranca desde ahí. Auto-corrector ante cuota agotada. Se pierde al reiniciar el proceso (aceptado).
+  - **Ollama local (dev)**: los modelos locales van al PRINCIPIO del pool en desarrollo para no gastar cuota de Gemini. En prod se quitan.
 - **Temperature**: `0` para minimizar alucinaciones y mantener respuestas basadas estrictamente en el contexto.
 - **Crédito de mensajes**: `15` preguntas por sesión.
 - **Parser de PDF**: `pdf-parse` por ser el más simple y eficiente para este caso de uso.
 - **Prompts**: cada funcionalidad tendrá su archivo dentro de `/prompts/` exportando constantes con los prompts.
 - **System prompt**: se define como constantes dentro de `/prompts/` en la primera versión. Se puede migrar a archivos `.md` separados si crecen.
 - **Output hacia el frontend**: tipos definidos en `types/StructuredOutput.ts`. Debe soportar respuestas de texto y opciones renderizables como botones (preparado para el futuro agente de calendario).
+
+### ModelPlanner (router de modelos)
+- **Archivos**:
+  - `types/models.ts` — `AvailableModels` (los 5 modelos de texto vivos; `gemini-2.5-flash-lite` se eliminó por deprecación 404), `Provider = "gemini" | "ollama"`, `ModelDescriptor { provider, model, rpd }`, `Task = "chat" | "extraction"`.
+  - `classes/providers.ts` — registry `PROVIDERS` que mapea `Provider` a la función constructora (`getGeminiLLM` / `ChatOllama`). Universal: todo LLM de LangChain implementa `BaseChatModel`, así que `invoke()` y `withStructuredOutput()` funcionan igual.
+  - `constants/models.ts` — `CHAT_POOL` y `EXTRACT_POOL` balanceados por RPD:
+    - `CHAT_POOL`: `gemini-3.6-flash` (20) → `gemini-3.5-flash-lite` (500) → `gemini-2.5-flash` (20)
+    - `EXTRACT_POOL`: `gemini-3.1-flash-lite` (500) → `gemini-3.5-flash` (20)
+  - `classes/modelPlanner.ts` — clase `ModelPlanner` con **un único método privado** (`resolveModel`) que concentra la lógica de fallback/last-functioning/cross-pool; `invoke` e `invokeStructured` son fachadas que lo llaman (DRY: se modifica en un solo lugar).
+    - El índice del último modelo con cuota por task se guarda en `lastFunctioningModelIndex` (antes "sticky"); cada llamada arranca desde ahí y hace round-robin ante 429.
+    - **CRÍTICO**: el fallback debe envolver la **invocación** del LLM (`invoke`), no solo la construcción del modelo. Construir un `ChatModel` no consume cuota — el 429 de cuota solo aparece dentro de `invoke()`. Si el planner solo resolviera el modelo, el round-robin jamás se dispararía en runtime. Por eso la API es `invoke(task, temp, messages)` / `invokeStructured(task, temp, payload, messages)`, no `getModel`/`getStructuredModel`.
+- **Handler universal**: `PROVIDERS` registry permite agregar proveedores no-Gemini (ej: Ollama) sin tocar la lógica del planner. Los modelos de Ollama para la RTX 5060 8GB (Q4_K_M): chat → `qwen3:8b` / `llama3.1:8b`; extracción JSON → `granite4:8b` / `mistral:7b`; velocidad → `phi4-mini:3.8b`.
+- **Caso extremo**: si TODOS los modelos fallan (incluido cross-pool), se lanza `AllModelsUnavailableError` → el controller responde HTTP 503 con mensaje canned estilo Moonie. El `messageLimit` NO se descuenta (el error corta `graph.invoke()` antes de `subtractOneMessageLimit`; el grafo queda intacto y lineal).
+- **Prueba de lógica**: `scripts/planner-smoke.ts` — test sin LLMs reales que inyecta providers falsos y verifica round-robin, sticky, propagación de errores reales y `AllModelsUnavailableError` (correr con `pnpm tsx scripts/planner-smoke.ts`).
 
 ### Nodos del grafo del agente de CV
 Se usa `conditionalEdge` para dirigir el flujo según `lastIntent` y el estado de `visitorInfo`.
@@ -158,3 +174,11 @@ El usuario envía un mensaje siendo que ya usó sus 15 preguntas.
 - [ ] Configurar Cloudflare para gestionar DNS de `alejandrochani.dev` y apuntar `api.alejandrochani.dev` a EC2 (manteniendo el frontend en Vercel).
 - [x] Definir comportamiento cuando se alcanza el límite de mensajes.
 - [x] Definir estructura del endpoint de descarga del CV (`/download/cv/:lang`).
+- [x] Definir `ModelPlanner` (pools, fallback, cross-pool, sticky, Ollama dev).
+- [x] Implementar `ModelPlanner` + `providers.ts` + pools en `constants/models.ts` (con prueba de lógica en `scripts/planner-smoke.ts`).
+- [x] Reemplazar uso de `LLMFactory` en `nodes.ts` por `ModelPlanner`.
+- [x] Manejar `AllModelsUnavailableError` en `controllers/personalData.ts` (HTTP 503, sin descontar messageLimit).
+- [x] Verificar `withStructuredOutput` con Ollama — RESUELTO: el provider `ollama` usa `method: "jsonMode"` (el default `jsonSchema` envía el `pattern` regex complejo del email de Zod, que crashea a qwen3:8b con ECONNRESET; jsonMode manda `format: "json"` simple y funciona). Probado con `scripts/ollama-live.ts`.
+- [x] Probar flujo completo end-to-end con Gemini (modelos 500 RPD: `gemini-3.5-flash-lite` chat + `gemini-3.1-flash-lite` extraction) — OK: presentación, extracción completa y clasificación de intento funcionan; `messageLimit` baja 15→14.
+- [x] Verificar `gemini-2.5-flash` (20 RPD) en vivo — responde OK; el 429 no se pudo gatillar porque tenía cuota disponible (la lógica de round-robin por 429 queda cubierta por `planner-smoke` T1).
+- [x] Sacar `gemini-2.5-flash-lite` — devolvía 404 ("no longer available to new users"); eliminado de `AvailableModels` y de `EXTRACT_POOL`. Si un modelo vuelve a quedar deprecado, un 404 NO es error de cuota → se propaga como error real (no se enmascara como fallback, por diseño).

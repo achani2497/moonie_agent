@@ -3,3 +3,6 @@ dist
 *.log
 .DS_Store
 .env
+
+*/ollama-live.ts
+*/planner-smoke.ts

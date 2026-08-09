@@ -1,6 +1,9 @@
 import { moonieState } from '@agent/state.js';
 import { modelPlanner } from '@classes/modelPlanner.js';
 import { AIMessage } from '@langchain/core/messages';
+import { RunnableConfig } from '@langchain/core/runnables';
+import { deliverMessage, type ChatEventEmitter } from '@services/stream/chatStream.js';
+import { emitNodeStatus } from '@services/stream/nodeStatus.js';
 import { getLastHumanMessage, getTaggedHumanMessages } from '@utils/state.js';
 import { intentSchema, presentationSchema } from '../schemas/presentation.js';
 import {
@@ -9,7 +12,11 @@ import {
   presentationPrompt,
 } from './prompts/personal.js';
 
-export const presentationAndLanguageDetection = async (state: typeof moonieState.State) => {
+export const presentationAndLanguageDetection = async (
+  state: typeof moonieState.State,
+  config: RunnableConfig,
+) => {
+
   const prompt = `
         Datos actuales del visitante:
         - Nombre: ${state.visitorInfo.name || 'no proporcionado'}
@@ -26,12 +33,17 @@ export const presentationAndLanguageDetection = async (state: typeof moonieState
     content: prompt,
   };
 
-  const response = await modelPlanner.invoke('chat', [systemMessage, ...state.messages]);
+  // uso deliverMessage para los nodos que generen alguna respuesta al usuario
+  const chatEventEmitter = config.configurable?.streamHandler as ChatEventEmitter | undefined;
+  const response = await deliverMessage(chatEventEmitter, 'chat', [systemMessage, ...state.messages]);
 
   return { messages: [response] };
 };
 
-export const EXTRACT_visitorInfo = async (state: typeof moonieState.State) => {
+export const EXTRACT_visitorInfo = async (state: typeof moonieState.State, config: RunnableConfig) => {
+  const chatEventEmitter = config.configurable?.streamHandler as ChatEventEmitter | undefined;
+  emitNodeStatus(chatEventEmitter, 'EXTRACT_visitorInfo');
+
   const lastHumanMessage = getTaggedHumanMessages(state);
   const oldMessages = lastHumanMessage.map((taggedMessage) => ({
     role: 'user',
@@ -68,7 +80,10 @@ export const subtractOneMessageLimit = (state: typeof moonieState.State) => {
   return { messageLimit: state.messageLimit - 1 };
 };
 
-export const classifyIntent = async (state: typeof moonieState.State) => {
+export const classifyIntent = async (state: typeof moonieState.State, config: RunnableConfig) => {
+  const chatEventEmitter = config.configurable?.streamHandler as ChatEventEmitter | undefined;
+  emitNodeStatus(chatEventEmitter, 'classifyIntent');
+
   const lastHumanMessage = getLastHumanMessage(state);
 
   if (typeof lastHumanMessage !== 'string') return { lastIntent: 'unknown' };

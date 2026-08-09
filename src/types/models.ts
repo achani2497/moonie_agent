@@ -17,7 +17,6 @@ export type Provider = 'gemini' | 'ollama';
 export type ModelDescriptor = {
   provider: Provider;
   model: string;
-  rpd: number;
 };
 
 export type Task = 'chat' | 'extraction';

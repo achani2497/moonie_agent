@@ -1,13 +1,17 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import type { AvailableModels, StructuredPayload } from '@moonie-types/models.js';
-import { PROVIDERS } from '@classes/providers.js';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatOllama } from '@langchain/ollama';
+import type { AvailableModels, ModelDescriptor, Provider, StructuredPayload } from '@moonie-types/models.js';
 
-// All entries in AvailableModels are currently gemini models. We delegate to the PROVIDERS
-// registry so the factory stays a thin convenience wrapper and never goes stale when new
-// models are added to the union.
+export type ModelFactory = (descriptor: ModelDescriptor, temperature: number) => BaseChatModel;
+
+export const PROVIDERS: Record<Provider, ModelFactory> = {
+  gemini: (descriptor, temperature) => new ChatGoogleGenerativeAI({ model: descriptor.model, temperature }),
+  ollama: (descriptor, temperature) => new ChatOllama({ model: descriptor.model, temperature }),
+};
 export class LLMFactory {
-  public getModel(model: AvailableModels, temperature: number): BaseChatModel {
-    return PROVIDERS['gemini']({ provider: 'gemini', model, rpd: 0 }, temperature);
+  public getModel(model: AvailableModels, temperature: number, provider: Provider = "gemini"): BaseChatModel {
+    return PROVIDERS[provider]({ provider: 'gemini', model }, temperature);
   }
 
   public getStructuredModel(

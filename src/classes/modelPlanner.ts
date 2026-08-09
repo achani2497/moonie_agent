@@ -1,8 +1,8 @@
 import { AllModelsUnavailableError } from '@classes/customError.js';
-import { PROVIDERS } from '@classes/providers.js';
 import { CHAT_POOL, EXTRACT_POOL } from '@constants/models.js';
 import { BaseMessage } from '@langchain/core/messages';
 import type { ModelDescriptor, StructuredPayload, Task } from '@moonie-types/models.js';
+import { PROVIDERS } from './llmFactory.js';
 
 const isQuotaError = (err: unknown): boolean => {
   if (!(err instanceof Error)) {
@@ -37,13 +37,13 @@ export class ModelPlanner {
     task: Task,
     run: (descriptor: ModelDescriptor) => Promise<T> | T,
   ): Promise<T> {
-    const chain = this.getChainOfModels(task);
-    const start = this.lastFunctioningModelIndex[task] % chain.length;
+    const modelsChain = this.getChainOfModels(task);
+    const start = this.lastFunctioningModelIndex[task] % modelsChain.length;
     const failures: Error[] = [];
 
-    for (let offset = 0; offset < chain.length; offset++) {
-      const i = (start + offset) % chain.length;
-      const modelDescriptor = chain[i];
+    for (let offset = 0; offset < modelsChain.length; offset++) {
+      const i = (start + offset) % modelsChain.length;
+      const modelDescriptor = modelsChain[i];
 
       try {
         const result = await run(modelDescriptor);
@@ -88,6 +88,52 @@ export class ModelPlanner {
       });
       return structuredLlm.invoke(messages);
     });
+  }
+
+  // Produce los tokens de la respuesta de forma continua: por cada token que
+  // genera, llama a `onGeneratedToken`.
+  public async generateTokens(
+    task: Task,
+    messages: (BaseMessage | { role: string; content: string })[],
+    temperature = 0,
+    onGeneratedToken: (token: string) => void,
+  ): Promise<string> {
+    const modelChains = this.getChainOfModels(task);
+    const startIndex = this.lastFunctioningModelIndex[task] % modelChains.length;
+    let fullContent = '';
+
+    for (let offset = 0; offset < modelChains.length; offset++) {
+      const modelIndex = (startIndex + offset) % modelChains.length;
+      const descriptor = modelChains[modelIndex];
+
+      try {
+        const llm = PROVIDERS[descriptor.provider](descriptor, temperature);
+        const llmStream = await llm.stream(messages);
+
+        let firstChunkReceived = false;
+        for await (const chunk of llmStream) {
+          if (!firstChunkReceived) {
+            // El sticky se mueve recién cuando sabemos que este modelo sí tiene
+            // cuota (el primer chunk llegó). Igual que resolveModel.
+            this.lastFunctioningModelIndex[task] = modelIndex;
+            firstChunkReceived = true;
+          }
+          const messageChunk = typeof chunk.content === 'string' ? (chunk.content as string) : '';
+          if (messageChunk) {
+            fullContent += messageChunk;
+            onGeneratedToken(messageChunk);
+          }
+        }
+        return fullContent;
+      } catch (error) {
+        // El 429 aparece antes de emitir tokens visibles.
+        if (isQuotaError(error)) continue;
+        // Cualquier otro tipo de error se propaga
+        throw error;
+      }
+    }
+
+    throw new AllModelsUnavailableError();
   }
 }
 

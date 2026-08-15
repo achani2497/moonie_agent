@@ -1,7 +1,9 @@
 import MoonieGraph from '@agent/graph.js';
+import { moonieState } from '@agent/state.js';
 import { Clients } from '@classes/clients.js';
 import { AllModelsUnavailableError, CustomError } from '@classes/customError.js';
 import { ENV } from '@constants/config.js';
+import { NoAvailableModelMessage } from '@constants/phrases.js';
 import { HumanMessage } from '@langchain/core/messages';
 import { runChatStream } from '@services/stream/chatStream.js';
 import { Request, Response } from 'express';
@@ -21,7 +23,7 @@ export const handleNewMessage = async (req: Request, res: Response) => {
     if (pendingByUser.has(userId)) {
       // Respuesta JSON ya que es un error a nivel HTTP, no un evento SSE.
       return res.status(409).json({
-        message: 'Todavía estoy procesando el último mensaje!',
+        message: 'Esperá un cachito, todavía estoy procesando el último mensaje!',
       });
     }
     pendingByUser.set(userId, true);
@@ -42,17 +44,16 @@ export const handleNewMessage = async (req: Request, res: Response) => {
     }
 
     // --- JSON response ---
-    const result = await MoonieGraph.invoke({ messages: [new HumanMessage(message)] }, config);
+    const result: typeof moonieState.State = await MoonieGraph.invoke({ messages: [new HumanMessage(message)] }, config);
 
     const finalMessage = result.messages[result.messages.length - 1];
 
-    return res.status(200).json({ message: finalMessage.content });
+    return res.status(200).json({ message: finalMessage.content, messageLimit: result.messageLimit });
   } catch (e) {
     // Si todos los modelos gratuitos se quedan sin cuota disponible, tiro este error genérico
     if (e instanceof AllModelsUnavailableError) {
       return res.status(503).json({
-        message:
-          'Uy, Moonie está teniendo problemas técnicos en este momento. Volvé a intentar en un ratito!',
+        message: NoAvailableModelMessage,
       });
     }
 

@@ -8,6 +8,10 @@ export const moonieState = Annotation.Root({
         reducer: (prev, curr) => prev.concat(curr),
         default: () => []
     }),
+    moonieHasAlreadyPresented: Annotation<boolean>({
+        reducer: (_, curr) => curr,
+        default: () => false
+    }),
     visitorInfo: Annotation<VisitorInfo>({
         reducer: (prev, curr) => ({
             name: curr.name || prev.name,
@@ -19,6 +23,14 @@ export const moonieState = Annotation.Root({
     lastIntent: Annotation<IntentType>({
         reducer: (_, curr) => curr,
         default: () => null
+    }),
+    cvContent: Annotation<string>({
+        reducer: (_, curr) => curr,
+        default: () => ''
+    }),
+    cvLoaded: Annotation<boolean>({
+        reducer: (_, curr) => curr,
+        default: () => false
     }),
     messageLimit: Annotation<number>({
         reducer: (_, curr) => curr,

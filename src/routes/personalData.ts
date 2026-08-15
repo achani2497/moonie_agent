@@ -8,6 +8,6 @@ const moonieRoutes: Router = Router()
 moonieRoutes.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', name: 'moonie' });
 });
-moonieRoutes.get('/new-message', handleNewMessage)
+moonieRoutes.post('/new-message', handleNewMessage)
 
 export default moonieRoutes

@@ -1,5 +1,7 @@
+import { moonieState } from '@agent/state.js';
 import { AllModelsUnavailableError } from '@classes/customError.js';
 import { modelPlanner } from '@classes/modelPlanner.js';
+import { GenericErrorMessage, NoAvailableModelMessage, SLOW_STATUS_MESSAGES } from '@constants/phrases.js';
 import { AIMessage, BaseMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import type { CompiledGraphType } from '@langchain/langgraph';
@@ -11,7 +13,7 @@ export type ChatEvent =
   | { type: 'status'; status: string }
   | { type: 'messageChunk'; content: string }
   | { type: 'options'; options: Option[] }
-  | { type: 'done' }
+  | { type: 'done', messageLimit?: number }
   | { type: 'error'; message: string };
 
 // Tipo de acciones que el front puede renderizar como Buttons
@@ -23,6 +25,8 @@ export type Option = {
 
 // Handler de emisión: construye el objeto que emite eventos de chat al front
 export const createChatEventEmitter = (response: Response) => {
+  let slowTimer: ReturnType<typeof setTimeout> | undefined;
+
   const setHeaders = () => {
     response.setHeader('Content-Type', 'text/event-stream');
     response.setHeader('Cache-Control', 'no-cache');
@@ -35,13 +39,28 @@ export const createChatEventEmitter = (response: Response) => {
     response.write(`data: ${JSON.stringify(event)}\n\n`);
   };
 
+  const clearSlowTimer = () => {
+    if (slowTimer) { clearTimeout(slowTimer); slowTimer = undefined; }
+  };
+
+  const armSlowTimer = () => {
+    clearSlowTimer(); // reiniciar por si otro nodo mudo emite status
+    slowTimer = setTimeout(() => {
+      slowTimer = undefined;
+      const phrase = SLOW_STATUS_MESSAGES[Math.floor(Math.random() * SLOW_STATUS_MESSAGES.length)];
+      emit({ type: 'status', status: phrase });
+    }, 5000);
+  };
+
   return {
     setHeaders,
     emitStatus: (status: string) => emit({ type: 'status', status }),
     streamMessageChunk: (content: string) => emit({ type: 'messageChunk', content }),
     emitOptions: (options: Option[]) => emit({ type: 'options', options }),
-    emitDone: () => emit({ type: 'done' }),
+    emitDone: (messageLimit?: number) => emit({ type: 'done', messageLimit }),
     emitError: (message: string) => emit({ type: 'error', message }),
+    dispose: clearSlowTimer,
+    armSlowTimer
   };
 };
 
@@ -68,7 +87,7 @@ export const runChatStream = async (
   const heartbeat = setInterval(() => response.write(': ping\n\n'), 15000);
 
   try {
-    await graph.invoke(input, {
+    const result: typeof moonieState.State = await graph.invoke(input, {
       ...config,
       signal: abortController.signal,
       configurable: {
@@ -76,14 +95,16 @@ export const runChatStream = async (
         streamHandler: chatEventEmitter,
       },
     });
-    chatEventEmitter.emitDone();
+    chatEventEmitter.emitDone(result.messageLimit);
   } catch (error) {
+    console.error('[runChatStream] Error al correr el grafo:', error);
     // Si el cliente ya se fue, no tiene sentido escribirle el error.
     if (!response.destroyed && !response.writableEnded) {
       chatEventEmitter.emitError(formatStreamError(error));
     }
   } finally {
     clearInterval(heartbeat);
+    chatEventEmitter.dispose()
     response.removeListener('close', onClose);
     response.end();
   }
@@ -91,9 +112,9 @@ export const runChatStream = async (
 
 const formatStreamError = (error: unknown): string => {
   if (error instanceof AllModelsUnavailableError) {
-    return 'Uy, Moonie está teniendo problemas técnicos en este momento. Volvé a intentar en un ratito!';
+    return NoAvailableModelMessage;
   }
-  return 'Ups, algo se rompió. Volvé a intentar en un momento.';
+  return GenericErrorMessage;
 };
 
 // Los nodos generadores usan esta abstracción para no repetir la lógica en cada nodo. Sirve para:

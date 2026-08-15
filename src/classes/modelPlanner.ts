@@ -116,6 +116,7 @@ export class ModelPlanner {
             // El sticky se mueve recién cuando sabemos que este modelo sí tiene
             // cuota (el primer chunk llegó). Igual que resolveModel.
             this.lastFunctioningModelIndex[task] = modelIndex;
+            console.info(`Utilizando el modelo: ${descriptor.model}`)
             firstChunkReceived = true;
           }
           const messageChunk = typeof chunk.content === 'string' ? (chunk.content as string) : '';

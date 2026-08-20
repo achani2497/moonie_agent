@@ -1,4 +1,4 @@
-export type IntentType = "cv-question" | "cv-download" | "other" | "unknown" | null
+export type IntentType = "cv-question" | "cv-download" | "other" | "unknown" | "set-meeting" | "send-telegram-message" | null
 
 export type AvailableLanguages = "es" | "en"
 

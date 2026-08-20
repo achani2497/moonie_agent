@@ -1,7 +1,7 @@
 import { moonieState } from '@agent/state.js';
 import { AllModelsUnavailableError } from '@classes/customError.js';
 import { modelPlanner } from '@classes/modelPlanner.js';
-import { GenericErrorMessage, NoAvailableModelMessage, SLOW_STATUS_MESSAGES } from '@constants/phrases.js';
+import { GenericErrorMessage, NoAvailableModelMessage, SLOW_STATUS_MESSAGES } from '@constants/messages.js';
 import { AIMessage, BaseMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import type { CompiledGraphType } from '@langchain/langgraph';

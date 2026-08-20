@@ -1,16 +1,19 @@
 import { moonieState } from '@agent/state.js';
 import { modelPlanner } from '@classes/modelPlanner.js';
+import { LimitReachedMessage, UnknownRequestMessage } from '@constants/messages.js';
+import { MESSAGE_TYPE_TAG } from '@constants/models.js';
 import { AIMessage, SystemMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { deliverMessage, type ChatEventEmitter } from '@services/stream/chatStream.js';
 import { emitNodeStatus } from '@services/stream/nodeStatus.js';
 import { readFile } from '@utils/files.js';
-import { getLastHumanMessage, getTaggedHumanMessages } from '@utils/state.js';
+import { getLastMessageFromType, getTaggedMessagesFromType } from '@utils/state.js';
 import { intentSchema, presentationSchema } from '../schemas/presentation.js';
 import {
   classifierPrompt,
   cvContextData,
   cvQuestionAnswerPrompt,
+  handleOtherRequestsPrompt,
   presentationParamExtractionPrompt,
   presentationPrompt,
   presentationPromptAfterFirstMessage
@@ -46,7 +49,7 @@ export const EXTRACT_visitorInfo = async (state: typeof moonieState.State, confi
   const chatEventEmitter = config.configurable?.streamHandler as ChatEventEmitter | undefined;
   emitNodeStatus(chatEventEmitter, 'EXTRACT_visitorInfo');
 
-  const lastHumanMessage = getTaggedHumanMessages(state);
+  const lastHumanMessage = getTaggedMessagesFromType('human', state);
   const oldMessages = lastHumanMessage.map((taggedMessage) => ({
     role: 'user',
     content: taggedMessage,
@@ -56,15 +59,6 @@ export const EXTRACT_visitorInfo = async (state: typeof moonieState.State, confi
     'extraction',
     { name: 'presentation_schema', schema: presentationSchema },
     [{ role: 'system', content: presentationParamExtractionPrompt }, ...oldMessages],
-  );
-
-  console.log(
-    (name || state.visitorInfo.name) &&
-      (email || state.visitorInfo.email) &&
-      (reason || state.visitorInfo.reason) &&
-      (language || state.language)
-      ? `Info completa del user! ${name || state.visitorInfo.name} ${email || state.visitorInfo.email} ${reason || state.visitorInfo.reason} ${language || state.language}`
-      : `Hasta ahora tengo ${name || state.visitorInfo.name} ${email || state.visitorInfo.email} ${reason || state.visitorInfo.reason} ${language || state.language}`,
   );
 
   return {
@@ -78,7 +72,6 @@ export const EXTRACT_visitorInfo = async (state: typeof moonieState.State, confi
 };
 
 export const subtractOneMessageLimit = (state: typeof moonieState.State) => {
-  console.log(`Nuevo limite de mensajes: ${state.messageLimit - 1}`);
   return { messageLimit: state.messageLimit - 1 };
 };
 
@@ -86,16 +79,22 @@ export const classifyIntent = async (state: typeof moonieState.State, config: Ru
   const chatEventEmitter = config.configurable?.streamHandler as ChatEventEmitter | undefined;
   emitNodeStatus(chatEventEmitter, 'classifyIntent');
 
-  const messageToClassify = state.visitorInfo.reason && state.lastIntent === null ? state.visitorInfo.reason : getLastHumanMessage(state);
+  const messageToClassify =
+    state.visitorInfo.reason && state.lastIntent === null ? state.visitorInfo.reason : getLastMessageFromType('human', state);
+  const lastAiMessage = getLastMessageFromType('ai', state) ?? ''
 
   if (typeof messageToClassify !== 'string') return { lastIntent: 'unknown' };
+
+  const HUMAN_TAG = MESSAGE_TYPE_TAG['human']
+  const AI_TAG = MESSAGE_TYPE_TAG['ai']
 
   const response = await modelPlanner.invokeStructured(
     'extraction',
     { name: 'intent_schema', schema: intentSchema },
     [
       { role: 'system', content: classifierPrompt },
-      { role: 'user', content: `<USER_MESSAGE>${messageToClassify}</USER_MESSAGE>` },
+      { role: 'user', content: `<${AI_TAG}>${lastAiMessage}</${AI_TAG}>` },
+      { role: 'user', content: `<${HUMAN_TAG}>${messageToClassify}</${HUMAN_TAG}>` },
     ],
   );
 
@@ -136,35 +135,30 @@ export const sendCVLink = (state: typeof moonieState.State) => {
   return { ...state };
 };
 
-export const handleOther = (state: typeof moonieState.State, config: RunnableConfig) => {
-  const streamHandler = config.configurable?.streamHandler as ChatEventEmitter | undefined;
+export const handleOther = async (state: typeof moonieState.State, config: RunnableConfig) => {
+  const chatEventEmitter = config.configurable?.streamHandler as ChatEventEmitter | undefined;
 
-  const prompt = 'Veo que tenés otro interés particular en la vida de Ale, y eso me mueve la cola!'
+  const otherIntentionPrompt = new SystemMessage(handleOtherRequestsPrompt);
 
-  const mockedOtherIntentionMessage = new AIMessage({ content: prompt });
+  const response = await deliverMessage(chatEventEmitter, 'chat', [otherIntentionPrompt, ...state.messages])
 
-  streamHandler?.streamMessageChunk(prompt)
-
-  return { messages: [mockedOtherIntentionMessage] };
+  return { messages: [response] };
 };
 
 export const handleUnknown = (state: typeof moonieState.State, config: RunnableConfig) => {
   const streamHandler = config.configurable?.streamHandler as ChatEventEmitter | undefined;
 
-  const prompt = 'Uyy, no me sé ese truco y no te puedo ayudar con eso. Pero como te dije, me encanta contarte sobre la vida profesional de Ale!'
+  const mockedUnknownIntentionMessage = new AIMessage({ content: UnknownRequestMessage });
 
-  const mockedUnknownIntentionMessage = new AIMessage({ content: prompt });
-
-  streamHandler?.streamMessageChunk(prompt)
+  streamHandler?.streamMessageChunk(UnknownRequestMessage)
   return { messages: [mockedUnknownIntentionMessage] };
 };
 
 export const sendMessageLimitExceeded = (state: typeof moonieState.State, config: RunnableConfig) => {
   const streamHandler = config.configurable?.streamHandler as ChatEventEmitter | undefined;
 
-  const prompt = 'Ay no! Ya llegaste al límite de mensajes del día, me toca dormir la siesta. Te espero mañanaaa!'
-  const mockedLimitReachedMessage = new AIMessage({ content: prompt });
+  const mockedLimitReachedMessage = new AIMessage({ content: LimitReachedMessage });
 
-  streamHandler?.streamMessageChunk(prompt);
+  streamHandler?.streamMessageChunk(LimitReachedMessage);
   return { messages: [mockedLimitReachedMessage] };
 };

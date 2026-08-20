@@ -3,7 +3,7 @@ import { moonieState } from '@agent/state.js';
 import { Clients } from '@classes/clients.js';
 import { AllModelsUnavailableError, CustomError } from '@classes/customError.js';
 import { ENV } from '@constants/config.js';
-import { NoAvailableModelMessage } from '@constants/phrases.js';
+import { NoAvailableModelMessage } from '@constants/messages.js';
 import { HumanMessage } from '@langchain/core/messages';
 import { runChatStream } from '@services/stream/chatStream.js';
 import { Request, Response } from 'express';

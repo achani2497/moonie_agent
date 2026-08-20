@@ -1,7 +1,7 @@
 import { answerCVQuestion, classifyIntent, EXTRACT_visitorInfo, handleOther, handleUnknown, loadContext, presentationAndLanguageDetection, sendMessageLimitExceeded, subtractOneMessageLimit } from '@agent/nodes.js';
 import { moonieState } from '@agent/state.js';
 import { END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
-import { messageLimitCheck, visitorDataIsCompleteCheck, visitorIntentionCheck } from './conditionalNodes.js';
+import { CHECK_messageLimit, CHECK_visitorDataIsComplete, CHECK_visitorIntention } from './conditionalNodes.js';
 
 const moonieGraph = new StateGraph(moonieState)
     // * Definicion de nodos
@@ -18,9 +18,9 @@ const moonieGraph = new StateGraph(moonieState)
     .addNode("handleUnknown", handleUnknown)
     .addNode("sendMessageLimitExceeded", sendMessageLimitExceeded)
     // * Definicion de aristas
-    .addConditionalEdges(START, messageLimitCheck)
-    .addConditionalEdges("classifyIntent", visitorIntentionCheck)
-    .addConditionalEdges("EXTRACT_visitorInfo", visitorDataIsCompleteCheck)
+    .addConditionalEdges(START, CHECK_messageLimit)
+    .addConditionalEdges("classifyIntent", CHECK_visitorIntention)
+    .addConditionalEdges("EXTRACT_visitorInfo", CHECK_visitorDataIsComplete)
     .addEdge("presentationAndLanguageDetection", "subtractOneMessageLimit")
     .addEdge("loadContext", "answerCVQuestion")
     // Aristas finales / Convergencia de Nodos

@@ -20,3 +20,5 @@ export type ModelDescriptor = {
 };
 
 export type Task = 'chat' | 'extraction';
+
+export type MessageType = 'human' | 'ai'

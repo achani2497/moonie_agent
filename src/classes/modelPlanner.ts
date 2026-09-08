@@ -1,6 +1,7 @@
 import { AllModelsUnavailableError } from '@classes/customError.js';
 import { CHAT_POOL, EXTRACT_POOL } from '@constants/models.js';
 import { BaseMessage } from '@langchain/core/messages';
+import { StructuredTool } from '@langchain/core/tools';
 import type { ModelDescriptor, StructuredPayload, Task } from '@moonie-types/models.js';
 import { PROVIDERS } from './llmFactory.js';
 
@@ -67,9 +68,10 @@ export class ModelPlanner {
     task: Task,
     messages: (BaseMessage | { role: string; content: string })[],
     temperature = 0,
+    tools: StructuredTool[] = []
   ) {
     return this.resolveModel(task, async (descriptor) => {
-      const llm = PROVIDERS[descriptor.provider](descriptor, temperature);
+      const llm = PROVIDERS[descriptor.provider](descriptor, temperature).bindTools!(tools);
       return llm.invoke(messages);
     });
   }

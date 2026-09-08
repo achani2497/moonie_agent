@@ -6,6 +6,7 @@ import type { ChatEventEmitter } from '@services/stream/chatStream.js';
 const NODE_STATUS_MESSAGES: Record<string, string> = {
   EXTRACT_visitorInfo: 'Identificando quién sos con mi olfato',
   classifyIntent: 'Agudizando las orejas para entender qué necesitás',
+  handleTelegramMessage: 'Llevandole tu mensaje a Ale'
 };
 
 export const emitNodeStatus = (chatEventEmitter: ChatEventEmitter | undefined, nodeName: string) => {

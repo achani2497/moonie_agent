@@ -1,7 +1,11 @@
-import { answerCVQuestion, classifyIntent, EXTRACT_visitorInfo, handleOther, handleUnknown, loadContext, presentationAndLanguageDetection, sendMessageLimitExceeded, subtractOneMessageLimit } from '@agent/nodes.js';
+import { answerCVQuestion, classifyIntent, confirmationActionResult, EXTRACT_visitorInfo, handleOther, handleTelegramMessage, handleUnknown, loadContext, presentationAndLanguageDetection, sendMessageLimitExceeded, subtractOneMessageLimit } from '@agent/nodes.js';
 import { moonieState } from '@agent/state.js';
+import { COMMUNICATION_TOOLS } from '@constants/toolSets.js';
 import { END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
-import { CHECK_messageLimit, CHECK_visitorDataIsComplete, CHECK_visitorIntention } from './conditionalNodes.js';
+import { ToolNode } from "@langchain/langgraph/prebuilt";
+import { CHECK_afterToolCall, CHECK_messageLimit, CHECK_toolCallWasBinded, CHECK_visitorDataIsComplete, CHECK_visitorIntention } from './conditionalNodes.js';
+
+const communicationTools = new ToolNode(COMMUNICATION_TOOLS)
 
 const moonieGraph = new StateGraph(moonieState)
     // * Definicion de nodos
@@ -11,9 +15,13 @@ const moonieGraph = new StateGraph(moonieState)
     .addNode("classifyIntent", classifyIntent)
     .addNode("loadContext", loadContext)
     .addNode("answerCVQuestion", answerCVQuestion)
+    .addNode("communicationTools", communicationTools)
+    .addNode("confirmationActionResult", confirmationActionResult)
     // .addNode("offerCVDownload", offerCVDownload)
     // .addNode("resolveDownloadLanguage", resolveDownloadLanguage)
     // .addNode("sendCVLink", sendCVLink)
+    .addNode("handleTelegramMessage", handleTelegramMessage)
+    // .addNode("handleMeetSetting", handleMeetSetting)
     .addNode("handleOther", handleOther)
     .addNode("handleUnknown", handleUnknown)
     .addNode("sendMessageLimitExceeded", sendMessageLimitExceeded)
@@ -21,9 +29,13 @@ const moonieGraph = new StateGraph(moonieState)
     .addConditionalEdges(START, CHECK_messageLimit)
     .addConditionalEdges("classifyIntent", CHECK_visitorIntention)
     .addConditionalEdges("EXTRACT_visitorInfo", CHECK_visitorDataIsComplete)
+    // Guard de seguridad antes de ir a un ToolNode para garantizar que hay una tool call esperando a ser invocada por el ToolNode
+    .addConditionalEdges("handleTelegramMessage", CHECK_toolCallWasBinded("communicationTools"))
+    .addConditionalEdges("communicationTools", CHECK_afterToolCall)
     .addEdge("presentationAndLanguageDetection", "subtractOneMessageLimit")
     .addEdge("loadContext", "answerCVQuestion")
     // Aristas finales / Convergencia de Nodos
+    .addEdge("confirmationActionResult", "subtractOneMessageLimit")
     .addEdge("handleOther", "subtractOneMessageLimit")
     .addEdge("handleUnknown", "subtractOneMessageLimit")
     .addEdge("answerCVQuestion", "subtractOneMessageLimit")

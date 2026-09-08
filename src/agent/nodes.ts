@@ -1,13 +1,15 @@
 import { moonieState } from '@agent/state.js';
 import { modelPlanner } from '@classes/modelPlanner.js';
-import { LimitReachedMessage, UnknownRequestMessage } from '@constants/messages.js';
+import { LimitReachedMessage, TOOL_CALL_RESPONSE_MESSAGES, UnknownRequestMessage } from '@constants/messages.js';
 import { MESSAGE_TYPE_TAG } from '@constants/models.js';
-import { AIMessage, SystemMessage } from '@langchain/core/messages';
+import { COMMUNICATION_TOOLS } from '@constants/toolSets.js';
+import { AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { deliverMessage, type ChatEventEmitter } from '@services/stream/chatStream.js';
 import { emitNodeStatus } from '@services/stream/nodeStatus.js';
 import { readFile } from '@utils/files.js';
-import { getLastMessageFromType, getTaggedMessagesFromType } from '@utils/state.js';
+import { getLastMessage, getLastMessageFromType, getTaggedMessagesFromType } from '@utils/state.js';
+import { handleFailedToolCall, toolCallFailed, toolWasCalled } from '@utils/tools.js';
 import { intentSchema, presentationSchema } from '../schemas/presentation.js';
 import {
   classifierPrompt,
@@ -16,7 +18,8 @@ import {
   handleOtherRequestsPrompt,
   presentationParamExtractionPrompt,
   presentationPrompt,
-  presentationPromptAfterFirstMessage
+  presentationPromptAfterFirstMessage,
+  sendingTelegramMessagePrompt
 } from './prompts/personal.js';
 
 export const presentationAndLanguageDetection = async (
@@ -154,6 +157,26 @@ export const handleUnknown = (state: typeof moonieState.State, config: RunnableC
   return { messages: [mockedUnknownIntentionMessage] };
 };
 
+export const handleTelegramMessage = async (state: typeof moonieState.State, config: RunnableConfig) => {
+
+  const chatEventEmitter = config.configurable?.streamHandler as ChatEventEmitter | undefined;
+
+  const { name, email, reason } = state.visitorInfo
+
+  const sendTelegramMessagePrompt = new SystemMessage(sendingTelegramMessagePrompt(name!, email!, reason!))
+
+  emitNodeStatus(chatEventEmitter, 'handleTelegramMessage')
+
+  const response = await modelPlanner.invoke('chat', [sendTelegramMessagePrompt, ...state.messages], 0, COMMUNICATION_TOOLS)
+
+  if (!toolWasCalled(response)) {
+    const failedMessage = handleFailedToolCall("handleTelegramMessage", "Perdón, tuve un problema para avisarle a Ale. ¿Lo intentamos de nuevo en un rato?", chatEventEmitter, response)
+    return { messages: [failedMessage] };
+  }
+
+  return { messages: [response] }
+}
+
 export const sendMessageLimitExceeded = (state: typeof moonieState.State, config: RunnableConfig) => {
   const streamHandler = config.configurable?.streamHandler as ChatEventEmitter | undefined;
 
@@ -162,3 +185,19 @@ export const sendMessageLimitExceeded = (state: typeof moonieState.State, config
   streamHandler?.streamMessageChunk(LimitReachedMessage);
   return { messages: [mockedLimitReachedMessage] };
 };
+
+export const confirmationActionResult = (state: typeof moonieState.State, config: RunnableConfig) => {
+  const chatEventEmitter = config.configurable?.streamHandler as ChatEventEmitter | undefined;
+
+  const lastMessage = getLastMessage(state) as ToolMessage
+
+  if (toolCallFailed(lastMessage)) {
+    throw new Error("Ups! No me salió ese truco :( Lo vuelvo a intentar?")
+  }
+
+  const message = TOOL_CALL_RESPONSE_MESSAGES[lastMessage.name ?? 'default']
+
+  chatEventEmitter?.streamMessageChunk(message)
+
+  return { messages: [new AIMessage({ content: message })] }
+}

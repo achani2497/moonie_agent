@@ -8,6 +8,6 @@ export const presentationSchema = z.object({
 })
 
 export const intentSchema = z.object({
-    intent: z.enum(["cv-question", "cv-download", "other", "unknown"])
+    intent: z.enum(["cv-question", "cv-download", "other", "send-telegram-message", "unknown"])
         .describe('Clasificación de la intención del último mensaje del usuario')
 })

@@ -1,0 +1,1 @@
+export const SEND_TELEGRAM_MESSAGE = "sendTelegramMessage"

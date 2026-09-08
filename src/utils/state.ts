@@ -23,3 +23,12 @@ export const getTaggedMessagesFromType = (type: MessageType, state: typeof mooni
 
     return parsedMessages
 }
+
+export const getLastMessage = (state: typeof moonieState.State) => {
+    return state.messages.pop()
+}
+
+export const lastMessageWasToolCall = (state: typeof moonieState.State) => {
+    const lastMessage = getLastMessage(state)
+    return lastMessage?.type === 'tool'
+}

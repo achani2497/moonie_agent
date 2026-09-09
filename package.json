@@ -34,6 +34,7 @@
     "@langfuse/langchain": "^5.9.0",
     "@langfuse/otel": "^5.9.1",
     "@opentelemetry/sdk-node": "^0.219.0",
+    "axios": "^1.19.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^4.21.0",

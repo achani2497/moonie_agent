@@ -1,3 +1,4 @@
+import { TELEGRAM_CAPABILITY } from '@constants/capabilities.js'
 import { z } from 'zod'
 
 export const presentationSchema = z.object({
@@ -8,6 +9,6 @@ export const presentationSchema = z.object({
 })
 
 export const intentSchema = z.object({
-    intent: z.enum(["cv-question", "cv-download", "other", "send-telegram-message", "unknown"])
+    intent: z.enum(["cv-question", "cv-download", "other", TELEGRAM_CAPABILITY.intent, "unknown"])
         .describe('Clasificación de la intención del último mensaje del usuario')
 })

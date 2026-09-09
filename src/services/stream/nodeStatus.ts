@@ -1,3 +1,4 @@
+import { TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
 import type { ChatEventEmitter } from '@services/stream/chatStream.js';
 
 // Copy aislado en un record: los mensajes de feedback que se muestran mientras
@@ -6,7 +7,7 @@ import type { ChatEventEmitter } from '@services/stream/chatStream.js';
 const NODE_STATUS_MESSAGES: Record<string, string> = {
   EXTRACT_visitorInfo: 'Identificando quién sos con mi olfato',
   classifyIntent: 'Agudizando las orejas para entender qué necesitás',
-  handleTelegramMessage: 'Llevandole tu mensaje a Ale'
+  [TELEGRAM_CAPABILITY.handlerNode]: TELEGRAM_CAPABILITY.statusMessage
 };
 
 export const emitNodeStatus = (chatEventEmitter: ChatEventEmitter | undefined, nodeName: string) => {

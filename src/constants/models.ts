@@ -1,3 +1,4 @@
+import { TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
 import type { MessageType, ModelDescriptor } from '@moonie-types/models.js';
 import { IntentType } from '@moonie-types/state.js';
 
@@ -23,7 +24,7 @@ export const INTENT_TO_NODE: Record<Exclude<IntentType, null>, string> = {
   'cv-question': 'loadContext',
   'other': 'handleOther',
   'set-meeting': 'handleOther',
-  'send-telegram-message': 'handleTelegramMessage',
+  [TELEGRAM_CAPABILITY.intent]: TELEGRAM_CAPABILITY.handlerNode,
   'unknown': 'handleUnknown',
   'cv-download': 'handleOther',
 }

@@ -1,5 +1,6 @@
 import { answerCVQuestion, classifyIntent, confirmationActionResult, EXTRACT_visitorInfo, handleOther, handleTelegramMessage, handleUnknown, loadContext, presentationAndLanguageDetection, sendMessageLimitExceeded, subtractOneMessageLimit } from '@agent/nodes.js';
 import { moonieState } from '@agent/state.js';
+import { TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
 import { COMMUNICATION_TOOLS } from '@constants/toolSets.js';
 import { END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
@@ -20,7 +21,7 @@ const moonieGraph = new StateGraph(moonieState)
     // .addNode("offerCVDownload", offerCVDownload)
     // .addNode("resolveDownloadLanguage", resolveDownloadLanguage)
     // .addNode("sendCVLink", sendCVLink)
-    .addNode("handleTelegramMessage", handleTelegramMessage)
+    .addNode(TELEGRAM_CAPABILITY.handlerNode, handleTelegramMessage)
     // .addNode("handleMeetSetting", handleMeetSetting)
     .addNode("handleOther", handleOther)
     .addNode("handleUnknown", handleUnknown)
@@ -30,7 +31,7 @@ const moonieGraph = new StateGraph(moonieState)
     .addConditionalEdges("classifyIntent", CHECK_visitorIntention)
     .addConditionalEdges("EXTRACT_visitorInfo", CHECK_visitorDataIsComplete)
     // Guard de seguridad antes de ir a un ToolNode para garantizar que hay una tool call esperando a ser invocada por el ToolNode
-    .addConditionalEdges("handleTelegramMessage", CHECK_toolCallWasBinded("communicationTools"))
+    .addConditionalEdges(TELEGRAM_CAPABILITY.handlerNode, CHECK_toolCallWasBinded("communicationTools"))
     .addConditionalEdges("communicationTools", CHECK_afterToolCall)
     .addEdge("presentationAndLanguageDetection", "subtractOneMessageLimit")
     .addEdge("loadContext", "answerCVQuestion")

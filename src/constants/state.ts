@@ -1,8 +1,8 @@
-import { ENV } from './config.js'
-import { SEND_TELEGRAM_MESSAGE } from './toolNames.js'
+import { TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
+import { ENV } from './config.js';
 
 export const MESSAGES_LIMIT = Number(ENV.CONFIG.MESSAGES_LIMIT) || 15
 
 export const NEXT_NODE_BY_TOOL = {
-    [SEND_TELEGRAM_MESSAGE]: "confirmationActionResult"
+    [TELEGRAM_CAPABILITY.toolName]: "confirmationActionResult"
 }

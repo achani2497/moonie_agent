@@ -1,4 +1,4 @@
-import { SEND_TELEGRAM_MESSAGE } from "./toolNames.js";
+import { TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
 
 export const SLOW_STATUS_MESSAGES = [
     'Estoy persiguiendo mi propia cola para pensar la respuesta',
@@ -16,5 +16,5 @@ export const LimitReachedMessage = 'Ay no! Ya llegaste al límite de mensajes de
 
 export const TOOL_CALL_RESPONSE_MESSAGES: Record<string, string> = {
     'default': "🐶 Me salió el truco!",
-    [SEND_TELEGRAM_MESSAGE]: "Ya le entregué el mensaje a Ale!🐶 Ni bien él lo vea se va a estar contactando con vos :)",
+    [TELEGRAM_CAPABILITY.toolName]: TELEGRAM_CAPABILITY.successMessage,
 }

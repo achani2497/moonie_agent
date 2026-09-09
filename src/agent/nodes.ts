@@ -1,5 +1,6 @@
 import { moonieState } from '@agent/state.js';
 import { modelPlanner } from '@classes/modelPlanner.js';
+import { TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
 import { LimitReachedMessage, TOOL_CALL_RESPONSE_MESSAGES, UnknownRequestMessage } from '@constants/messages.js';
 import { MESSAGE_TYPE_TAG } from '@constants/models.js';
 import { COMMUNICATION_TOOLS } from '@constants/toolSets.js';
@@ -165,12 +166,12 @@ export const handleTelegramMessage = async (state: typeof moonieState.State, con
 
   const sendTelegramMessagePrompt = new SystemMessage(sendingTelegramMessagePrompt(name!, email!, reason!))
 
-  emitNodeStatus(chatEventEmitter, 'handleTelegramMessage')
+  emitNodeStatus(chatEventEmitter, TELEGRAM_CAPABILITY.handlerNode)
 
   const response = await modelPlanner.invoke('chat', [sendTelegramMessagePrompt, ...state.messages], 0, COMMUNICATION_TOOLS)
 
   if (!toolWasCalled(response)) {
-    const failedMessage = handleFailedToolCall("handleTelegramMessage", "Perdón, tuve un problema para avisarle a Ale. ¿Lo intentamos de nuevo en un rato?", chatEventEmitter, response)
+    const failedMessage = handleFailedToolCall(TELEGRAM_CAPABILITY.handlerNode, "Perdón, tuve un problema para avisarle a Ale. ¿Lo intentamos de nuevo en un rato?", chatEventEmitter, response)
     return { messages: [failedMessage] };
   }
 

@@ -1,9 +1,9 @@
 import { moonieState } from '@agent/state.js';
 import { modelPlanner } from '@classes/modelPlanner.js';
-import { TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
-import { LimitReachedMessage, TOOL_CALL_RESPONSE_MESSAGES, UnknownRequestMessage } from '@constants/messages.js';
+import { CAPABILITIES, CHECK_CALENDAR_CAPABILITY, TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
+import { LimitReachedMessage, TOOL_CALL_RESPONSE_MESSAGES, UnknownRequestMessage, EmptyResponseMessage } from '@constants/messages.js';
 import { MESSAGE_TYPE_TAG } from '@constants/models.js';
-import { COMMUNICATION_TOOLS } from '@constants/toolSets.js';
+import { CALENDAR_TOOLS, COMMUNICATION_TOOLS } from '@constants/toolSets.js';
 import { AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { deliverMessage, type ChatEventEmitter } from '@services/stream/chatStream.js';
@@ -13,6 +13,7 @@ import { getLastMessage, getLastMessageFromType, getTaggedMessagesFromType } fro
 import { handleFailedToolCall, toolCallFailed, toolWasCalled } from '@utils/tools.js';
 import { intentSchema, presentationSchema } from '../schemas/presentation.js';
 import {
+  checkCalendarSlotsPrompt,
   classifierPrompt,
   cvContextData,
   cvQuestionAnswerPrompt,
@@ -146,6 +147,15 @@ export const handleOther = async (state: typeof moonieState.State, config: Runna
 
   const response = await deliverMessage(chatEventEmitter, 'chat', [otherIntentionPrompt, ...state.messages])
 
+  // Si el modelo devuelve vacío/STOP (quota, bloqueo, etc), no dejamos el turno mudo:
+  // logueamos el finishReason y mostramos un fallback amable.
+  if (typeof response.content === 'string' && !response.content.trim()) {
+    console.error('[handleOther] respuesta vacía del modelo. finishReason:', (response.response_metadata as Record<string, unknown>)?.finishReason);
+    const fallbackMessage = new AIMessage({ content: EmptyResponseMessage });
+    chatEventEmitter?.streamMessageChunk(EmptyResponseMessage);
+    return { messages: [fallbackMessage] };
+  }
+
   return { messages: [response] };
 };
 
@@ -196,9 +206,39 @@ export const confirmationActionResult = (state: typeof moonieState.State, config
     throw new Error("Ups! No me salió ese truco :( Lo vuelvo a intentar?")
   }
 
-  const message = TOOL_CALL_RESPONSE_MESSAGES[lastMessage.name ?? 'default']
+  const lastToolCalled = lastMessage.name!
+
+  const capability = CAPABILITIES[lastToolCalled]
+
+  const message = capability?.returnsUserFacingContent
+    ? String(lastMessage.content)
+    : TOOL_CALL_RESPONSE_MESSAGES[lastToolCalled ?? 'default']
 
   chatEventEmitter?.streamMessageChunk(message)
 
   return { messages: [new AIMessage({ content: message })] }
+}
+
+export const handleCalendarCheck = async (state: typeof moonieState.State, config: RunnableConfig) => {
+  const chatEventEmitter = config.configurable?.streamHandler as ChatEventEmitter | undefined;
+
+  const checkCalendarPrompt = new SystemMessage(checkCalendarSlotsPrompt)
+
+  emitNodeStatus(chatEventEmitter, CHECK_CALENDAR_CAPABILITY.handlerNode)
+
+  const response = await modelPlanner.invoke('chat', [checkCalendarPrompt, ...state.messages], 0, CALENDAR_TOOLS)
+
+  if (!toolWasCalled(response)) {
+    // El modelo puede responder legítimamente sin llamar la tool (ej: pidiendo más datos).
+    // En ese caso su texto ES la respuesta: se muestra y NO se trata como un fallo.
+    if (typeof response.content === 'string' && response.content.trim()) {
+      chatEventEmitter?.streamMessageChunk(response.content);
+      return { messages: [response] };
+    }
+
+    const failedMessage = handleFailedToolCall(CHECK_CALENDAR_CAPABILITY.handlerNode, "Perdón, tuve un problema para revisar los horarios de Ale. ¿Lo intentamos de nuevo en un rato?", chatEventEmitter, response)
+    return { messages: [failedMessage] };
+  }
+
+  return { messages: [response] }
 }

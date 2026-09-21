@@ -14,5 +14,17 @@ export const ENV = {
     TELEGRAM: {
         BOT_TOKEN: process.env.BOT_TOKEN,
         CHAT_ID: process.env.CHAT_ID
+    },
+    CALENDAR: {
+        HORARIO_DEFAULT_DESDE: '09:00',
+        HORARIO_DEFAULT_HASTA: '17:00',
+        DIAS_HABILES_VENTANA: 5,
+        SLOT_MINIMO_MINUTOS: 30,
+        ZONA_HORARIA: 'America/Argentina/Buenos_Aires'
+    },
+    GOOGLE: {
+        CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+        CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+        REFRESH_TOKEN: process.env.GOOGLE_REFRESH_TOKEN
     }
 }

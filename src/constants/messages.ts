@@ -12,6 +12,8 @@ export const GenericErrorMessage = 'Ups, algo se rompió pero yo no fui. Volvé 
 
 export const UnknownRequestMessage = 'Uyy, no me sé ese truco y no te puedo ayudar con eso. Pero como te dije, me encanta contarte sobre la vida profesional de Ale!'
 
+export const EmptyResponseMessage = 'Uy, se me escapó la pelota un segundo y no llegué a procesar tu mensaje. ¿Me lo repetís?'
+
 export const LimitReachedMessage = 'Ay no! Ya llegaste al límite de mensajes del día, me toca dormir la siesta. Te espero mañanaaa!'
 
 export const TOOL_CALL_RESPONSE_MESSAGES: Record<string, string> = {

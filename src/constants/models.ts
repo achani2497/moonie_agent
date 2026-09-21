@@ -1,4 +1,4 @@
-import { TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
+import { CHECK_CALENDAR_CAPABILITY, TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
 import type { MessageType, ModelDescriptor } from '@moonie-types/models.js';
 import { IntentType } from '@moonie-types/state.js';
 
@@ -25,6 +25,7 @@ export const INTENT_TO_NODE: Record<Exclude<IntentType, null>, string> = {
   'other': 'handleOther',
   'set-meeting': 'handleOther',
   [TELEGRAM_CAPABILITY.intent]: TELEGRAM_CAPABILITY.handlerNode,
+  [CHECK_CALENDAR_CAPABILITY.intent]: CHECK_CALENDAR_CAPABILITY.handlerNode,
   'unknown': 'handleUnknown',
   'cv-download': 'handleOther',
 }

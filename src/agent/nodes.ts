@@ -1,7 +1,7 @@
 import { moonieState } from '@agent/state.js';
 import { modelPlanner } from '@classes/modelPlanner.js';
-import { CAPABILITIES, CHECK_CALENDAR_CAPABILITY, TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
-import { LimitReachedMessage, TOOL_CALL_RESPONSE_MESSAGES, UnknownRequestMessage, EmptyResponseMessage } from '@constants/messages.js';
+import { CAPABILITIES, CHECK_CALENDAR_CAPABILITY, SET_MEETING_CAPABILITY, TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
+import { EmptyResponseMessage, LimitReachedMessage, TOOL_CALL_RESPONSE_MESSAGES, UnknownRequestMessage } from '@constants/messages.js';
 import { MESSAGE_TYPE_TAG } from '@constants/models.js';
 import { CALENDAR_TOOLS, COMMUNICATION_TOOLS } from '@constants/toolSets.js';
 import { AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
@@ -21,7 +21,8 @@ import {
   presentationParamExtractionPrompt,
   presentationPrompt,
   presentationPromptAfterFirstMessage,
-  sendingTelegramMessagePrompt
+  sendingTelegramMessagePrompt,
+  setMeetingPrompt
 } from './prompts/personal.js';
 
 export const presentationAndLanguageDetection = async (
@@ -93,11 +94,16 @@ export const classifyIntent = async (state: typeof moonieState.State, config: Ru
   const HUMAN_TAG = MESSAGE_TYPE_TAG['human']
   const AI_TAG = MESSAGE_TYPE_TAG['ai']
 
+  const previousTurnContext =
+    state.lastIntent === CHECK_CALENDAR_CAPABILITY.intent
+      ? `\n\nCONTEXTO: el turno ANTERIOR fue "${CHECK_CALENDAR_CAPABILITY.intent}" — al usuario ya se le mostraron los horarios libres de la agenda de Ale y se le pidió que confirme cuál le queda cómodo. Si ahora confirma una fecha y/o una hora puntual, clasificá SIEMPRE como "${SET_MEETING_CAPABILITY.intent}", aunque no use palabras como "agendá", "reunión" o "videollamada".`
+      : ''
+
   const response = await modelPlanner.invokeStructured(
     'extraction',
     { name: 'intent_schema', schema: intentSchema },
     [
-      { role: 'system', content: classifierPrompt },
+      { role: 'system', content: `${classifierPrompt}${previousTurnContext}` },
       { role: 'user', content: `<${AI_TAG}>${lastAiMessage}</${AI_TAG}>` },
       { role: 'user', content: `<${HUMAN_TAG}>${messageToClassify}</${HUMAN_TAG}>` },
     ],
@@ -201,12 +207,17 @@ export const confirmationActionResult = (state: typeof moonieState.State, config
   const chatEventEmitter = config.configurable?.streamHandler as ChatEventEmitter | undefined;
 
   const lastMessage = getLastMessage(state) as ToolMessage
+  const lastToolCalled = lastMessage.name!
 
   if (toolCallFailed(lastMessage)) {
+    if (lastToolCalled === SET_MEETING_CAPABILITY.toolName) {
+      const failureMessage = String(lastMessage.content)
+      chatEventEmitter?.streamMessageChunk(failureMessage)
+      return { messages: [new AIMessage({ content: failureMessage })] }
+    }
+
     throw new Error("Ups! No me salió ese truco :( Lo vuelvo a intentar?")
   }
-
-  const lastToolCalled = lastMessage.name!
 
   const capability = CAPABILITIES[lastToolCalled]
 
@@ -216,7 +227,13 @@ export const confirmationActionResult = (state: typeof moonieState.State, config
 
   chatEventEmitter?.streamMessageChunk(message)
 
-  return { messages: [new AIMessage({ content: message })] }
+  const updates: Partial<typeof moonieState.State> = { messages: [new AIMessage({ content: message })] }
+
+  if (lastToolCalled === SET_MEETING_CAPABILITY.toolName) {
+    updates.meetingCreated = true
+  }
+
+  return updates
 }
 
 export const handleCalendarCheck = async (state: typeof moonieState.State, config: RunnableConfig) => {
@@ -237,6 +254,36 @@ export const handleCalendarCheck = async (state: typeof moonieState.State, confi
     }
 
     const failedMessage = handleFailedToolCall(CHECK_CALENDAR_CAPABILITY.handlerNode, "Perdón, tuve un problema para revisar los horarios de Ale. ¿Lo intentamos de nuevo en un rato?", chatEventEmitter, response)
+    return { messages: [failedMessage] };
+  }
+
+  return { messages: [response] }
+}
+
+export const handleSetMeeting = async (state: typeof moonieState.State, config: RunnableConfig) => {
+  const chatEventEmitter = config.configurable?.streamHandler as ChatEventEmitter | undefined;
+
+  if (state.meetingCreated) {
+    const alreadyMessage = 'Ya te agendé la reunión con Ale y te envié la invitación por mail con el link de Meet. Si necesitás cambiarla, contactate con Ale por ese medio 🐶';
+    chatEventEmitter?.streamMessageChunk(alreadyMessage);
+    return { messages: [new AIMessage({ content: alreadyMessage })] };
+  }
+
+  const setMeetingSystemPrompt = new SystemMessage(setMeetingPrompt)
+
+  emitNodeStatus(chatEventEmitter, SET_MEETING_CAPABILITY.handlerNode)
+
+  const response = await modelPlanner.invoke('chat', [setMeetingSystemPrompt, ...state.messages], 0, CALENDAR_TOOLS)
+
+  if (!toolWasCalled(response)) {
+    // El modelo puede responder legítimamente sin llamar la tool (ej: pidiendo confirmar un dato).
+    // En ese caso su texto ES la respuesta: se muestra y NO se trata como un fallo.
+    if (typeof response.content === 'string' && response.content.trim()) {
+      chatEventEmitter?.streamMessageChunk(response.content);
+      return { messages: [response] };
+    }
+
+    const failedMessage = handleFailedToolCall(SET_MEETING_CAPABILITY.handlerNode, "Perdón, tuve un problema para agendar la reunión. ¿Lo intentamos de nuevo en un rato?", chatEventEmitter, response)
     return { messages: [failedMessage] };
   }
 

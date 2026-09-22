@@ -3,7 +3,7 @@ import { TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
 export const SLOW_STATUS_MESSAGES = [
     'Estoy persiguiendo mi propia cola para pensar la respuesta',
     'Masticando bien la idea',
-    'Esto me está llevando más que atrapar la pelota, un segundo',
+    'Esto me está llevando más tiempo que atrapar mi cola, un segundo',
 ];
 
 export const NoAvailableModelMessage = 'Woof... no estoy pudiendo hacer el truco que me pediste por problemas con mis adiestradores :(. Volvé a intentar en un ratito!'

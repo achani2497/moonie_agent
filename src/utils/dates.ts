@@ -52,6 +52,14 @@ export function formatTimeToHHMM(date: Date): string {
     }).format(date);
 }
 
+export function addMinutesToHHMM(time: string, minutes: number): string {
+    const [hours, mins] = time.split(':').map(Number);
+    const total = (hours * 60 + mins + minutes) % (24 * 60);
+    const hh = String(Math.floor(total / 60)).padStart(2, '0');
+    const mm = String(total % 60).padStart(2, '0');
+    return `${hh}:${mm}`;
+}
+
 /** Formatea un Date a día y mes en Argentina */
 export function formatDate(date: Date): string {
     return new Intl.DateTimeFormat('es-AR', {

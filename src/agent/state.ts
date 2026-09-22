@@ -44,4 +44,8 @@ export const moonieState = Annotation.Root({
         reducer: (_, curr) => curr,
         default: () => "en"
     }),
+    meetingCreated: Annotation<boolean>({
+        reducer: (_, curr) => curr,
+        default: () => false
+    }),
 })

@@ -1,6 +1,6 @@
-import { answerCVQuestion, classifyIntent, confirmationActionResult, EXTRACT_visitorInfo, handleCalendarCheck, handleOther, handleTelegramMessage, handleUnknown, loadContext, presentationAndLanguageDetection, sendMessageLimitExceeded, subtractOneMessageLimit } from '@agent/nodes.js';
+import { answerCVQuestion, classifyIntent, confirmationActionResult, EXTRACT_visitorInfo, handleCalendarCheck, handleOther, handleSetMeeting, handleTelegramMessage, handleUnknown, loadContext, presentationAndLanguageDetection, sendMessageLimitExceeded, subtractOneMessageLimit } from '@agent/nodes.js';
 import { moonieState } from '@agent/state.js';
-import { CHECK_CALENDAR_CAPABILITY, TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
+import { CHECK_CALENDAR_CAPABILITY, SET_MEETING_CAPABILITY, TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
 import { CALENDAR_TOOLS, COMMUNICATION_TOOLS } from '@constants/toolSets.js';
 import { END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
@@ -25,7 +25,7 @@ const moonieGraph = new StateGraph(moonieState)
     // .addNode("resolveDownloadLanguage", resolveDownloadLanguage)
     // .addNode("sendCVLink", sendCVLink)
     .addNode(TELEGRAM_CAPABILITY.handlerNode, handleTelegramMessage)
-    // .addNode("handleMeetSetting", handleMeetSetting)
+    .addNode(SET_MEETING_CAPABILITY.handlerNode, handleSetMeeting)
     .addNode("handleOther", handleOther)
     .addNode("handleUnknown", handleUnknown)
     .addNode("sendMessageLimitExceeded", sendMessageLimitExceeded)
@@ -37,6 +37,7 @@ const moonieGraph = new StateGraph(moonieState)
     .addConditionalEdges(TELEGRAM_CAPABILITY.handlerNode, CHECK_toolCallWasBinded("communicationTools"))
     .addConditionalEdges("communicationTools", CHECK_afterToolCall)
     .addConditionalEdges(CHECK_CALENDAR_CAPABILITY.handlerNode, CHECK_toolCallWasBinded("calendarTools"))
+    .addConditionalEdges(SET_MEETING_CAPABILITY.handlerNode, CHECK_toolCallWasBinded("calendarTools"))
     .addConditionalEdges("calendarTools", CHECK_afterToolCall)
     .addEdge("presentationAndLanguageDetection", "subtractOneMessageLimit")
     .addEdge("loadContext", "answerCVQuestion")

@@ -11,7 +11,7 @@ type Capability = {
 
 export const TELEGRAM_CAPABILITY: Capability = {
   intent: 'send-telegram-message',
-  intentDescription: 'el usuario/visitante quiere que le envíes un mensaje por Telegram a Ale con la información que ya te proveyó, su "name", "email" y "reason"',
+  intentDescription: 'el usuario/visitante quiere que le envíes un mensaje a Ale por Telegram con su "name", "email" y "reason". SOLO cuando el usuario pide explícitamente contactar/avisar/escribir a Ale por mensaje directo (ej: "avisale a Ale", "mandale un mensaje", "contactalo"). NO clasifiques acá si el usuario viene de ver la agenda y confirma un horario — eso es "set-meeting", aunque diga "avisale a Ale" de paso',
   userFacingAction: 'Enviar mensaje via Telegram',
   handlerNode: 'handleTelegramMessage',
   toolName: 'sendTelegramMessage',
@@ -31,7 +31,19 @@ export const CHECK_CALENDAR_CAPABILITY: Capability = {
   returnsUserFacingContent: true,
 }
 
+export const SET_MEETING_CAPABILITY: Capability = {
+  intent: 'set-meeting',
+  intentDescription: 'El usuario/visitante confirmó un horario libre de la agenda de Ale y quiere que le agendes la videollamada en su Google Calendar (invitación + Meet). AUNQUE el usuario no use palabras como "agendá", "reunión" o "videollamada": si viene de ver la agenda (turno anterior "check-calendar") y da una fecha y/o una hora, es "set-meeting"',
+  userFacingAction: 'Agendar videollamada en el Calendar de Ale',
+  handlerNode: 'handleSetMeeting',
+  toolName: 'setMeeting',
+  statusMessage: 'Agendando tu videollamada con Ale',
+  successMessage: '',
+  returnsUserFacingContent: true,
+}
+
 export const CAPABILITIES = {
   [TELEGRAM_CAPABILITY.toolName]: TELEGRAM_CAPABILITY,
   [CHECK_CALENDAR_CAPABILITY.toolName]: CHECK_CALENDAR_CAPABILITY,
+  [SET_MEETING_CAPABILITY.toolName]: SET_MEETING_CAPABILITY,
 } as const;

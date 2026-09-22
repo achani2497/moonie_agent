@@ -1,5 +1,6 @@
 import { ENV } from '@constants/config.js';
-import { addDays, formatDate, formatTimeToHHMM, isWeekend, normalizeIso, toArgDate, todayInArgentina } from './dates.js';
+import type { CalendarEventBody } from '@moonie-types/calendar.js';
+import { addDays, addMinutesToHHMM, formatDate, formatTimeToHHMM, isWeekend, normalizeIso, toArgDate, todayInArgentina } from './dates.js';
 
 /** Intervalo ocupado devuelto por freebusy: solo necesita inicio y fin en formato ISO (desacoplado de googleapis) */
 export interface BusyInterval {
@@ -107,4 +108,29 @@ export function getFreeSlots(busySlots: BusyInterval[], days: string[], windowSt
     }
 
     return freeSlots
+}
+
+export function buildEventRequestBody({ visitorName, visitorEmail, reason, date, timeFrom, timeTo }: {
+    visitorName: string;
+    visitorEmail: string;
+    reason: string;
+    date: string;
+    timeFrom: string;
+    timeTo?: string;
+}): CalendarEventBody {
+    const endTime = timeTo ?? addMinutesToHHMM(timeFrom, ENV.CALENDAR.DURACION_REUNION_DEFAULT_MIN);
+
+    return {
+        summary: `${visitorName} - ${ENV.CALENDAR.NOMBRE_ANFITRION}`,
+        description: `[Moonie] | ${reason}`,
+        start: { dateTime: `${date}T${timeFrom}:00`, timeZone: ENV.CALENDAR.ZONA_HORARIA },
+        end: { dateTime: `${date}T${endTime}:00`, timeZone: ENV.CALENDAR.ZONA_HORARIA },
+        attendees: [{ email: visitorEmail }],
+        conferenceData: {
+            createRequest: {
+                requestId: `moonie-${date}-${timeFrom}-${Date.now()}`,
+                conferenceSolutionKey: { type: 'hangoutsMeet' },
+            },
+        },
+    };
 }

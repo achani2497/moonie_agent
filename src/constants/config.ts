@@ -16,10 +16,13 @@ export const ENV = {
         CHAT_ID: process.env.CHAT_ID
     },
     CALENDAR: {
+        CALENDAR_ID: process.env.GOOGLE_CALENDAR_ID || 'primary',
         HORARIO_DEFAULT_DESDE: '09:00',
         HORARIO_DEFAULT_HASTA: '17:00',
         DIAS_HABILES_VENTANA: 5,
         SLOT_MINIMO_MINUTOS: 30,
+        DURACION_REUNION_DEFAULT_MIN: 30,
+        NOMBRE_ANFITRION: 'Alejandro Chañi',
         ZONA_HORARIA: 'America/Argentina/Buenos_Aires'
     },
     GOOGLE: {

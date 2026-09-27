@@ -4,20 +4,9 @@
   "description": "Asistente personal con agentes de código (LangChain / LangGraph / LangFuse) y API REST",
   "type": "module",
   "packageManager": "pnpm@9.0.0",
-  "imports": {
-    "@agent/*": "./src/agent/*",
-    "@classes/*": "./src/classes/*",
-    "@constants/*": "./src/constants/*",
-    "@controllers/*": "./src/controllers/*",
-    "@routes/*": "./src/routes/*",
-    "@services/*": "./src/services/*",
-    "@schemas/*": "./src/schemas/*",
-    "@moonie-types/*": "./src/types/*",
-    "@utils/*": "./src/utils/*"
-  },
   "scripts": {
     "dev": "tsx watch --inspect src/index.ts",
-    "build": "tsc",
+    "build": "tsc && tsc-alias && node scripts/postbuild.mjs",
     "start": "node dist/index.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -55,6 +44,7 @@
     "eslint-plugin-prettier": "^5.0.0",
     "globals": "^17.7.0",
     "prettier": "^3.0.0",
+    "tsc-alias": "^1.9.5",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.65.0"

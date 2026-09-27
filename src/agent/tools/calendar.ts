@@ -9,7 +9,7 @@ import type { ChatEventEmitter } from "@services/stream/chatStream.js";
 import { getDateRange, getDaySlotOptions, getFreeSlots } from "@utils/calendar.js";
 import { formatDate, toArgDate } from "@utils/dates.js";
 import z from 'zod';
-import { checkCalendarSchema, setMeetingSchema } from "../../schemas/calendar.js";
+import { checkCalendarSchema, setMeetingSchema } from "@schemas/calendar.js";
 
 type MoonieState = typeof moonieState.State;
 

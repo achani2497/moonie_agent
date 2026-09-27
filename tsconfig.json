@@ -19,7 +19,9 @@
       "@classes/*": ["./src/classes/*"],
       "@constants/*": ["./src/constants/*"],
       "@controllers/*": ["./src/controllers/*"],
+      "@routes/*": ["./src/routes/*"],
       "@services/*": ["./src/services/*"],
+      "@schemas/*": ["./src/schemas/*"],
       "@moonie-types/*": ["./src/types/*"],
       "@utils/*": ["./src/utils/*"]
     }

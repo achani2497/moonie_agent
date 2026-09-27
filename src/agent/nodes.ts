@@ -11,7 +11,7 @@ import { emitNodeStatus } from '@services/stream/nodeStatus.js';
 import { readFile } from '@utils/files.js';
 import { getLastMessage, getLastMessageFromType, getTaggedMessagesFromType } from '@utils/state.js';
 import { handleFailedToolCall, toolCallFailed, toolWasCalled } from '@utils/tools.js';
-import { intentSchema, presentationSchema } from '../schemas/presentation.js';
+import { intentSchema, presentationSchema } from '@schemas/presentation.js';
 import {
   checkCalendarSlotsPrompt,
   classifierPrompt,
@@ -23,7 +23,7 @@ import {
   presentationPromptAfterFirstMessage,
   sendingTelegramMessagePrompt,
   setMeetingPrompt
-} from './prompts/personal.js';
+} from '@agent/prompts/personal.js';
 
 export const presentationAndLanguageDetection = async (
   state: typeof moonieState.State,

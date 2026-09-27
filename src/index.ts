@@ -2,7 +2,7 @@ import { ENV } from '@constants/config.js';
 import cors from 'cors';
 import 'dotenv/config';
 import express from 'express';
-import moonieRoutes from './routes/personalData.js';
+import moonieRoutes from '@routes/personalData.js';
 
 
 const app = express();

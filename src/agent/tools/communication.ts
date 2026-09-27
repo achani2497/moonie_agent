@@ -1,7 +1,7 @@
 import { TELEGRAM_CAPABILITY } from "@constants/capabilities.js";
 import { tool } from "@langchain/core/tools";
 import { sendMessage } from "@services/telegram.js";
-import { TelegramMessage } from "../../schemas/telegram.js";
+import { TelegramMessage } from "@schemas/telegram.js";
 
 export const sendTelegramMessage = tool(async ({ message }) => {
     await sendMessage(message);

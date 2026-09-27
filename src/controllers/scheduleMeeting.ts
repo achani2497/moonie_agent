@@ -2,7 +2,7 @@ import { CustomError } from '@classes/customError.js';
 import { ScheduleMeetingErrorMessage, SessionValidationErrorMessage } from '@constants/messages.js';
 import { scheduleMeetingBySlot } from '@services/scheduling.js';
 import { Request, Response } from 'express';
-import { scheduleMeetingRequestSchema } from '../schemas/calendar.js';
+import { scheduleMeetingRequestSchema } from '@schemas/calendar.js';
 
 export const handleScheduleMeeting = async (req: Request, res: Response) => {
     const parsed = scheduleMeetingRequestSchema.safeParse(req.body);

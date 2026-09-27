@@ -6,13 +6,11 @@ import { ENV } from '@constants/config.js';
 import { NoAvailableModelMessage } from '@constants/messages.js';
 import { HumanMessage } from '@langchain/core/messages';
 import { runChatStream } from '@services/stream/chatStream.js';
+import { isUserLocked, lockUser, unlockUser } from '@services/userLock.js';
 import { Request, Response } from 'express';
 
 const clients = new Clients();
 const langfuseHandler = clients.handler;
-
-// Guard de concurrencia: queue para evitar que un user pueda enviar un mensaje mientras otro se está procesando.
-const pendingByUser = new Map<string, true>();
 
 export const handleNewMessage = async (req: Request, res: Response) => {
   const { userId, message } = req.body;
@@ -20,13 +18,13 @@ export const handleNewMessage = async (req: Request, res: Response) => {
   try {
     if (!userId || !message) throw new CustomError('Invalid body', 400);
 
-    if (pendingByUser.has(userId)) {
+    if (isUserLocked(userId)) {
       // Respuesta JSON ya que es un error a nivel HTTP, no un evento SSE.
       return res.status(409).json({
         message: 'Esperá un cachito, todavía estoy procesando el último mensaje!',
       });
     }
-    pendingByUser.set(userId, true);
+    lockUser(userId);
 
     const userWantsStreamedResponse = req.headers.accept?.includes('text/event-stream');
 
@@ -64,6 +62,6 @@ export const handleNewMessage = async (req: Request, res: Response) => {
 
     return res.status(code).json({ message });
   } finally {
-    pendingByUser.delete(userId);
+    if (userId) unlockUser(userId);
   }
 };

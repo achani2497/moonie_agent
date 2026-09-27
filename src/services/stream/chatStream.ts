@@ -2,6 +2,7 @@ import { moonieState } from '@agent/state.js';
 import { AllModelsUnavailableError } from '@classes/customError.js';
 import { modelPlanner } from '@classes/modelPlanner.js';
 import { GenericErrorMessage, NoAvailableModelMessage, SLOW_STATUS_MESSAGES } from '@constants/messages.js';
+import type { OptionAction } from '@constants/chat.js';
 import { AIMessage, BaseMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import type { CompiledGraphType } from '@langchain/langgraph';
@@ -9,7 +10,7 @@ import type { Task } from '@moonie-types/models.js';
 import { Response } from 'express';
 
 // Tipo de eventos que se emiten al front
-export type ChatEvent =
+type ChatEvent =
   | { type: 'status'; status: string }
   | { type: 'messageChunk'; content: string }
   | { type: 'options'; options: Option[] }
@@ -17,10 +18,10 @@ export type ChatEvent =
   | { type: 'error'; message: string };
 
 // Tipo de acciones que el front puede renderizar como Buttons
-export type Option = {
+type Option = {
   label: string;
   value: string;
-  action: 'download-cv' | 'schedule-meeting' | 'open-calendar';
+  action: OptionAction;
 };
 
 // Handler de emisión: construye el objeto que emite eventos de chat al front

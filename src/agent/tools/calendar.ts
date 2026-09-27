@@ -1,11 +1,13 @@
 import { moonieState } from "@agent/state.js";
 import { CHECK_CALENDAR_CAPABILITY, SET_MEETING_CAPABILITY } from "@constants/capabilities.js";
 import { ENV } from "@constants/config.js";
+import { OPTION_ACTIONS } from "@constants/chat.js";
 import { tool, type ToolRuntime } from "@langchain/core/tools";
 import { getCalendar } from "@services/google.js";
-import { sendMessage } from "@services/telegram.js";
-import { buildEventRequestBody, getDateRange, getFreeSlots } from "@utils/calendar.js";
-import { addMinutesToHHMM, formatDate, toArgDate } from "@utils/dates.js";
+import { buildMeetingConfirmationMessage, createMeeting } from "@services/meeting.js";
+import type { ChatEventEmitter } from "@services/stream/chatStream.js";
+import { getDateRange, getDaySlotOptions, getFreeSlots } from "@utils/calendar.js";
+import { formatDate, toArgDate } from "@utils/dates.js";
 import z from 'zod';
 import { checkCalendarSchema, setMeetingSchema } from "../../schemas/calendar.js";
 
@@ -18,6 +20,7 @@ export const checkCalendarTool = tool(
     ) => {
         // El ToolNode inyecta el state actual del grafo vía runtime.state
         const visitorName = runtime?.state?.visitorInfo?.name ?? null;
+        const chatEventEmitter = runtime?.configurable?.streamHandler as ChatEventEmitter | undefined;
 
         console.log(`\n🔵 Consultando disponibilidad: ${dateFrom ?? '(ventana default)'} → ${dateTo ?? (dateFrom ?? '(5 días hábiles)')}, ventana horaria ${timeFrom ?? ENV.CALENDAR.HORARIO_DEFAULT_DESDE} - ${timeTo ?? ENV.CALENDAR.HORARIO_DEFAULT_HASTA}`);
 
@@ -25,6 +28,9 @@ export const checkCalendarTool = tool(
 
         // 1. Definir rango de consulta (desde inicio del primer día hasta fin del último)
         const { rangeStart, rangeEnd, windowStartTime, windowEndTime, days } = getDateRange(dateFrom, dateTo, timeFrom, timeTo)
+
+        // Día puntual = el usuario pidió horarios de UNA fecha particular
+        const isSingleDay = Boolean(dateFrom) && days.length === 1;
 
         // 2. Consultar freeBusy API (una sola llamada para todo el rango)
         let response;
@@ -47,6 +53,27 @@ export const checkCalendarTool = tool(
         const busySlots = response.data.calendars?.['primary']?.busy ?? [];
         console.log(`   Bloques ocupados encontrados: ${busySlots.length}`);
 
+        if (isSingleDay && chatEventEmitter) {
+            const dayStr = days[0];
+            const slotOptions = getDaySlotOptions(busySlots, dayStr, windowStartTime, windowEndTime);
+
+            if (slotOptions.length === 0) {
+                return visitorName
+                    ? `Perdón ${visitorName}, no encontré horarios libres para ese día. ¿Querés que busque en otros días?`
+                    : `No encontré horarios libres para ese día. ¿Querés que busque en otros días?`;
+            }
+
+            chatEventEmitter?.emitOptions(slotOptions.map(({ label, value }) => ({
+                label,
+                value,
+                action: OPTION_ACTIONS.scheduleMeeting,
+            })));
+
+            const greeting = visitorName ? `¡Genial, ${visitorName}!` : '¡Genial!';
+            return `${greeting} Estos son los horarios libres de Ale para el ${formatDate(toArgDate(dayStr))} (horarios de Argentina). Elegí el que te quede cómodo 👇`;
+        }
+
+        // --- Camino rango: listado en texto (comportamiento original) ---
         const freeSlots: string[] = getFreeSlots(busySlots, days, windowStartTime, windowEndTime);
 
         if (freeSlots.length === 0) {
@@ -60,7 +87,7 @@ export const checkCalendarTool = tool(
     },
     {
         name: CHECK_CALENDAR_CAPABILITY.toolName,
-        description: "Consulta disponibilidad en el calendario de Ale para una o varias fechas, con rango horario opcional. Devuelve los horarios libres agrupados por día. Si no se pasan fechas, calcula la ventana de los próximos 5 días hábiles desde mañana.",
+        description: "Consulta disponibilidad en el calendario de Ale para una o varias fechas, con rango horario opcional. Para UNA fecha puntual devuelve los horarios libres como opciones de 30 min seleccionables; para un rango devuelve un listado de texto agrupado por día. Si no se pasan fechas, calcula la ventana de los próximos 5 días hábiles desde mañana.",
         schema: checkCalendarSchema,
     }
 )
@@ -79,41 +106,9 @@ export const setMeetingTool = tool(
             throw new Error('Me falta algún dato tuyo (nombre, email o motivo) para poder agendar la reunión. ¿Me lo repetís?');
         }
 
-        console.log(`\n📅 Agendando reunión: ${date} ${timeFrom}${timeTo ? ` → ${timeTo}` : ` (+${ENV.CALENDAR.DURACION_REUNION_DEFAULT_MIN} min)`} con ${visitorName} <${visitorEmail}>`);
+        const { eventLink, durationLabel } = await createMeeting({ visitorName, visitorEmail, reason, date, timeFrom, timeTo });
 
-        const calendar = getCalendar();
-        const requestBody = buildEventRequestBody({ visitorName, visitorEmail, reason, date, timeFrom, timeTo });
-
-        let created;
-        try {
-            created = await calendar.events.insert({
-                calendarId: ENV.CALENDAR.CALENDAR_ID,
-                requestBody,
-                sendUpdates: 'all',
-                conferenceDataVersion: 1,
-            });
-        } catch (error: any) {
-            console.error(`   ❌ Error al crear el evento: ${error?.status ?? ''} ${error?.message ?? error}`);
-            console.error(`   Detalle:`, JSON.stringify(error?.response?.data ?? error?.response ?? error, null, 2)?.slice(0, 1500));
-            throw new Error(visitorName
-                ? `Perdón ${visitorName}, no pude agendar la reunión en el calendario de Ale en este momento (problema temporal con Google Calendar). ¿Querés que lo intente de nuevo?`
-                : `Perdón, no pude agendar la reunión en el calendario de Ale en este momento (problema temporal con Google Calendar). ¿Querés que lo intente de nuevo?`);
-        }
-
-        const meetEntryPoint = created.data.conferenceData?.entryPoints?.find(
-            (entryPoint) => entryPoint.entryPointType === 'video',
-        );
-        const meetLink = created.data.hangoutLink ?? meetEntryPoint?.uri ?? '';
-
-        const endTime = timeTo ?? addMinutesToHHMM(timeFrom, ENV.CALENDAR.DURACION_REUNION_DEFAULT_MIN);
-        const durationLabel = timeTo
-            ? `${timeFrom} - ${endTime}`
-            : `${timeFrom} - ${endTime} (${ENV.CALENDAR.DURACION_REUNION_DEFAULT_MIN} min)`;
-
-        const notice = `📅 Nueva reunión agendada en tu calendario:\n👤 ${visitorName} <${visitorEmail}>\n🗓️ ${formatDate(toArgDate(date))} ${durationLabel} (horarios de Argentina)${meetLink ? `\n🔗 Meet: ${meetLink}` : ''}\n💬 Motivo: ${reason}`;
-        void sendMessage(notice).catch((error) => console.error('[setMeeting] aviso a Ale falló (el evento sí se creó):', error));
-
-        return `¡Listo ${visitorName}! Te agendé la videollamada con Ale para el ${formatDate(toArgDate(date))} de ${durationLabel} (horarios de Argentina) 🐶\n\nTe envié la invitación por mail con el link de Meet:\n${meetLink}\n\nCualquier cosa, me ladras!`;
+        return buildMeetingConfirmationMessage({ visitorName, date, durationLabel, eventLink });
     },
     {
         name: SET_MEETING_CAPABILITY.toolName,

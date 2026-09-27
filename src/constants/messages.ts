@@ -16,6 +16,12 @@ export const EmptyResponseMessage = 'Uy, se me escapó la pelota un segundo y no
 
 export const LimitReachedMessage = 'Ay no! Ya llegaste al límite de mensajes del día, me toca dormir la siesta. Te espero mañanaaa!'
 
+// Mensajes del endpoint determinístico de agenda (POST /schedule-meeting).
+export const SessionValidationErrorMessage = 'No pude validar tu sesión. Probá de nuevo desde el chat.';
+export const ScheduleMeetingErrorMessage = 'No pude agendar la reunión. ¿Lo intentamos de nuevo?';
+export const ScheduleMeetingBusyMessage = 'Ya estoy agendando esa reunión, dame un segundo 🐶';
+export const MeetingAlreadyScheduledMessage = 'Ya tenés una reunión agendada con Ale. Si querés cambiarla, contactalo por mail 🐶';
+
 export const TOOL_CALL_RESPONSE_MESSAGES: Record<string, string> = {
     'default': "🐶 Me salió el truco!",
     [TELEGRAM_CAPABILITY.toolName]: TELEGRAM_CAPABILITY.successMessage,

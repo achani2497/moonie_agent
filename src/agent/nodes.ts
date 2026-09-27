@@ -219,7 +219,7 @@ export const confirmationActionResult = (state: typeof moonieState.State, config
     throw new Error("Ups! No me salió ese truco :( Lo vuelvo a intentar?")
   }
 
-  const capability = CAPABILITIES[lastToolCalled]
+  const capability = CAPABILITIES[lastToolCalled as keyof typeof CAPABILITIES]
 
   const message = capability?.returnsUserFacingContent
     ? String(lastMessage.content)

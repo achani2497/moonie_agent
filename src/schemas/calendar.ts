@@ -70,3 +70,10 @@ export const setMeetingSchema = z.object({
         "(ej: 'de 14 a 15' → '15:00'). Si no se envía, la reunión dura 30 minutos por default. Requiere timeFrom."
     )
 }).superRefine(timeRangeRefiner);
+
+export const scheduleMeetingRequestSchema = z.object({
+    userId: z.string().min(1).describe('ID del hilo/usuario (thread_id) que viene del front.'),
+    value: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, 'Horario inválido').describe(
+        "Horario elegido, opaco para el front: 'yyyy-mm-ddTHH:mm' en hora Argentina (ej: '2026-09-29T09:00')."
+    ),
+});

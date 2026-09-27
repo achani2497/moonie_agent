@@ -9,7 +9,7 @@ type Capability = {
   returnsUserFacingContent: boolean // true = el resultado de la tool se muestra directamente al usuario; false = se usa successMessage
 }
 
-export const TELEGRAM_CAPABILITY: Capability = {
+export const TELEGRAM_CAPABILITY = {
   intent: 'send-telegram-message',
   intentDescription: 'el usuario/visitante quiere que le envíes un mensaje a Ale por Telegram con su "name", "email" y "reason". SOLO cuando el usuario pide explícitamente contactar/avisar/escribir a Ale por mensaje directo (ej: "avisale a Ale", "mandale un mensaje", "contactalo"). NO clasifiques acá si el usuario viene de ver la agenda y confirma un horario — eso es "set-meeting", aunque diga "avisale a Ale" de paso',
   userFacingAction: 'Enviar mensaje via Telegram',
@@ -18,9 +18,9 @@ export const TELEGRAM_CAPABILITY: Capability = {
   statusMessage: 'Llevandole tu mensaje a Ale',
   successMessage: 'Ya le entregué el mensaje a Ale!🐶 Ni bien él lo vea se va a estar contactando con vos :)',
   returnsUserFacingContent: false,
-} as const;
+} as const satisfies Capability;
 
-export const CHECK_CALENDAR_CAPABILITY: Capability = {
+export const CHECK_CALENDAR_CAPABILITY = {
   intent: 'check-calendar',
   intentDescription: 'El usuario/visitante quiere que le des los slots libres que tenga Ale en su agenda segun su Google Calendar',
   userFacingAction: 'Chequear slot disponible en el Calendar de Ale',
@@ -29,9 +29,9 @@ export const CHECK_CALENDAR_CAPABILITY: Capability = {
   statusMessage: 'Olfateando los lugares libres',
   successMessage: '',
   returnsUserFacingContent: true,
-}
+} as const satisfies Capability;
 
-export const SET_MEETING_CAPABILITY: Capability = {
+export const SET_MEETING_CAPABILITY = {
   intent: 'set-meeting',
   intentDescription: 'El usuario/visitante confirmó un horario libre de la agenda de Ale y quiere que le agendes la videollamada en su Google Calendar (invitación + Meet). AUNQUE el usuario no use palabras como "agendá", "reunión" o "videollamada": si viene de ver la agenda (turno anterior "check-calendar") y da una fecha y/o una hora, es "set-meeting"',
   userFacingAction: 'Agendar videollamada en el Calendar de Ale',
@@ -40,7 +40,7 @@ export const SET_MEETING_CAPABILITY: Capability = {
   statusMessage: 'Agendando tu videollamada con Ale',
   successMessage: '',
   returnsUserFacingContent: true,
-}
+} as const satisfies Capability;
 
 export const CAPABILITIES = {
   [TELEGRAM_CAPABILITY.toolName]: TELEGRAM_CAPABILITY,

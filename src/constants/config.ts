@@ -9,7 +9,8 @@ export const ENV = {
         LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY,
         LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
         LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL,
-        MESSAGES_LIMIT: process.env.MESSAGES_LIMIT
+        MESSAGES_LIMIT: process.env.MESSAGES_LIMIT,
+        DB_PATH: process.env.DB_PATH || "./var/moonie.db"
     },
     TELEGRAM: {
         BOT_TOKEN: process.env.BOT_TOKEN,

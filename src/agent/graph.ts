@@ -1,8 +1,9 @@
 import { answerCVQuestion, classifyIntent, confirmationActionResult, EXTRACT_visitorInfo, handleCalendarCheck, handleOther, handleSetMeeting, handleTelegramMessage, handleUnknown, loadContext, presentationAndLanguageDetection, sendMessageLimitExceeded, subtractOneMessageLimit } from '@agent/nodes.js';
 import { moonieState } from '@agent/state.js';
+import { moonieCheckpointer } from '@agent/checkpointer.js';
 import { CHECK_CALENDAR_CAPABILITY, SET_MEETING_CAPABILITY, TELEGRAM_CAPABILITY } from '@constants/capabilities.js';
 import { CALENDAR_TOOLS, COMMUNICATION_TOOLS } from '@constants/toolSets.js';
-import { END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
+import { END, START, StateGraph } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { CHECK_afterToolCall, CHECK_messageLimit, CHECK_toolCallWasBinded, CHECK_visitorDataIsComplete, CHECK_visitorIntention } from './conditionalNodes.js';
 
@@ -50,5 +51,4 @@ const moonieGraph = new StateGraph(moonieState)
     .addEdge("subtractOneMessageLimit", END)
 
 
-const memorySaver = new MemorySaver()
-export default moonieGraph.compile({ checkpointer: memorySaver })
+export default moonieGraph.compile({ checkpointer: moonieCheckpointer })

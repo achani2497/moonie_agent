@@ -4,6 +4,12 @@ dist
 .DS_Store
 .env
 
+# Estado en runtime (checkpointer SQLite + WAL)
+/var/
+*.db
+*.db-wal
+*.db-shm
+
 */ollama-live.ts
 */planner-smoke.ts
 */streaming_implementation.md
